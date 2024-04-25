@@ -13,11 +13,12 @@ class BoTDb:
         except sqlite3.IntegrityError:
             pass
 
-    def add_event(self, date, time, fake):
+    def add_event(self, date, time, text, image, fake):
         try:
             datetime = date + " " + time
-            self.cursor.execute("INSERT INTO 'event_list' ('datetime', 'fake') VALUES (?, ?)",
-                                (datetime, fake))
+            self.cursor.execute("INSERT INTO 'event_list' ('datetime', 'event_text', 'image', 'fake') VALUES (?, ?, "
+                                "?, ?)",
+                                (datetime, text, image, fake))
             return self.db.commit()
         except sqlite3.IntegrityError:
             pass

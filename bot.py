@@ -3,7 +3,7 @@ import asyncio
 import random
 import sys
 from datetime import datetime
-from keys import BOT_TOKEN, HOOPS_ID
+from keys import BOT_TOKEN, HOOPS_ID, PASSWORD
 from db import BoTDb
 from aiogram import F
 from aiogram.filters.callback_data import CallbackData
@@ -14,6 +14,7 @@ from aiogram.filters.command import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.types import FSInputFile
 
 bot_db = BoTDb('participants.db')
 dp = Dispatcher(storage=MemoryStorage())
@@ -25,6 +26,8 @@ class EnterState(StatesGroup):
 
 class ContestState(StatesGroup):
     time = State()
+    text = State()
+    image = State()
     fake = State()
 
 
@@ -38,7 +41,7 @@ async def start_menu(message: types.Message, state: FSMContext):
 async def password(message: types.Message, state: FSMContext):
     await state.update_data(password=message.text)
     dat = await state.get_data()
-    if dat['password'] == "52":
+    if dat['password'] == PASSWORD:
         admin_btn_1 = types.InlineKeyboardButton(text='Создать новый розыгрыш', callback_data='event')
         admin_btn_2 = types.InlineKeyboardButton(text='Удалить текущий розыгрыш', callback_data='del_event')
         admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2)
@@ -90,17 +93,36 @@ async def password(message: types.Message, state: FSMContext):
     try:
         tm = datetime.strptime(message.text, '%H:%M')
         await state.update_data(time=message.text)
-        await message.answer('Это фейковый розыгрыш? Если да то напишите имя пользователя, если нет то напишите "n"')
-        await state.set_state(ContestState.fake)
+        await message.answer("Напишите текст для розыгрыша")
+        await state.set_state(ContestState.text)
     except ValueError:
         await message.answer('неверный формат')
+
+
+@dp.message(ContestState.text)
+async def password(message: types.Message, state: FSMContext):
+    await state.update_data(text=message.text)
+    await message.answer('Прикрепите фото разыгрываемого лота')
+    await state.set_state(ContestState.image)
+
+
+@dp.message(ContestState.image)
+async def password(message: types.Message, state: FSMContext, bot: Bot):
+    if message.photo:
+        file_name = f"photos/{message.photo[-1].file_id}.jpg"
+        await bot.download(message.photo[-1], destination=file_name)
+        await state.update_data(image=f'{message.photo[-1].file_id}.jpg')
+        await message.answer('Это фейковый розыгрыш? Если да то напишите имя пользователя, если нет то напишите "n"')
+        await state.set_state(ContestState.fake)
+    else:
+        await message.answer('Это не фото')
 
 
 @dp.message(ContestState.fake)
 async def password(message: types.Message, state: FSMContext):
     await state.update_data(fake=message.text)
     dat = await state.get_data()
-    bot_db.add_event(dat['date'], dat['time'], dat['fake'])
+    bot_db.add_event(dat['date'], dat['time'], dat['text'], dat['image'], dat['fake'])
     await message.answer('Все готово')
     await state.clear()
 
@@ -148,17 +170,18 @@ async def notifications(time, bot: Bot):
             date = datetime.strptime(event[1], '%d/%m/%Y %H:%M')
             delta = date - date.now()
             hours = delta.total_seconds() // 3600
-            print(hours)
-            if hours <= 3:
+            if 0 <= hours <= 3:
                 members = bot_db.get_members()
                 for i in members:
-                    user_id, user_name = i[0], i[1]
-                    await bot.send_message(user_id, f'Приветствую {user_name}. Через {int(hours)} час(а) конурс')
+                    user_id = i[0]
+                    await bot.send_message(user_id, f'Через {int(hours)} час(а) конурс')
             if delta.total_seconds() == 0:
+                image = FSInputFile(f'photos/{event[4]}')
                 if event[2] != 'n':
-                    await bot.send_message(HOOPS_ID, f'Итак конурс. Победил @{event[2]}')
+                    await bot.send_photo(HOOPS_ID, photo=image, caption=event[3] + f'\n Победил: @{event[2]}')
                 else:
-                    await bot.send_message(HOOPS_ID, f'Итак конурс. Победил @{random.choice(members)[1]}')
+                    await bot.send_photo(HOOPS_ID, photo=image,
+                                         caption=event[3] + f'\n Победил: @{random.choice(members)[1]}')
         await asyncio.sleep(time)
 
 
