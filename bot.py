@@ -44,11 +44,39 @@ async def password(message: types.Message, state: FSMContext):
     if dat['password'] == PASSWORD:
         admin_btn_1 = types.InlineKeyboardButton(text='Создать новый розыгрыш', callback_data='event')
         admin_btn_2 = types.InlineKeyboardButton(text='Удалить текущий розыгрыш', callback_data='del_event')
-        admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2)
+        admin_btn_3 = types.InlineKeyboardButton(text='Текущий розыгрыш', callback_data='details')
+        admin_btn_4 = types.InlineKeyboardButton(text='Текущие участники', callback_data='members')
+        admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2).add(admin_btn_3).add(admin_btn_4)
         await message.answer('Приветствую в панели админа Пидарсина', reply_markup=admin_markup.as_markup())
         await state.clear()
     else:
         await message.answer('Неправильный пароль')
+
+
+@dp.callback_query(F.data == 'details')
+async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
+    await bot.answer_callback_query(callback_query.id)
+    event_det = bot_db.get_event_details()
+    if event_det:
+        await callback_query.message.answer(f'Дата: {event_det[1]} \n'
+                                            f'Текст поста: {event_det[3]} \n'
+                                            f"Фейк: {event_det[2] if 'n' else 'yes'} \n"
+                                            f"Ссылка на фото: {event_det[-1]}")
+    else:
+        await callback_query.message.answer('Нет текущего ивента')
+
+
+@dp.callback_query(F.data == 'members')
+async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
+    await bot.answer_callback_query(callback_query.id)
+    event_memb = bot_db.get_members()
+    st = ''
+    if event_memb:
+        for i in event_memb:
+            st += f'Ник: {i[1]}, ID: {i[0]} \n'
+        await callback_query.message.answer(st)
+    else:
+        await callback_query.message.answer('Нет текущего ивента')
 
 
 @dp.callback_query(F.data == 'event')
@@ -170,7 +198,8 @@ async def notifications(time, bot: Bot):
             date = datetime.strptime(event[1], '%d/%m/%Y %H:%M')
             delta = date - date.now()
             hours = delta.total_seconds() // 3600
-            if 0 <= hours <= 3:
+            print(hours, delta.total_seconds())
+            if 0 < hours <= 3:
                 members = bot_db.get_members()
                 for i in members:
                     user_id = i[0]
@@ -178,10 +207,10 @@ async def notifications(time, bot: Bot):
             if delta.total_seconds() == 0:
                 image = FSInputFile(f'photos/{event[4]}')
                 if event[2] != 'n':
-                    await bot.send_photo(HOOPS_ID, photo=image, caption=event[3] + f'\n Победил: @{event[2]}')
+                    await bot.send_photo(HOOPS_ID, photo=image, caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
                 else:
                     await bot.send_photo(HOOPS_ID, photo=image,
-                                         caption=event[3] + f'\n Победил: @{random.choice(members)[1]}')
+                                         caption='@all \n' + event[3] + f'\n Победил: @{random.choice(members)[1]}')
         await asyncio.sleep(time)
 
 
