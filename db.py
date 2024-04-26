@@ -39,3 +39,7 @@ class BoTDb:
     def get_members(self):
         result = self.cursor.execute("SELECT user_id, user_name FROM `event_members`")
         return result.fetchall()
+
+    def get_member_by_id(self, user_name):
+        result = self.cursor.execute("SELECT user_id FROM `event_members` WHERE `user_name` = ", (user_name, ))
+        return result.fetchone()

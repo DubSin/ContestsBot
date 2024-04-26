@@ -47,7 +47,7 @@ async def password(message: types.Message, state: FSMContext):
         admin_btn_3 = types.InlineKeyboardButton(text='Текущий розыгрыш', callback_data='details')
         admin_btn_4 = types.InlineKeyboardButton(text='Текущие участники', callback_data='members')
         admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2).add(admin_btn_3).add(admin_btn_4)
-        await message.answer('Приветствую в панели админа Пидарсина', reply_markup=admin_markup.as_markup())
+        await message.answer('Приветствую в панели админа ', reply_markup=admin_markup.as_markup())
         await state.clear()
     else:
         await message.answer('Неправильный пароль')
@@ -207,10 +207,14 @@ async def notifications(time, bot: Bot):
             if delta.total_seconds() == 0:
                 image = FSInputFile(f'photos/{event[4]}')
                 if event[2] != 'n':
+                    winner_id = bot_db.get_member_by_id(event[2])
                     await bot.send_photo(HOOPS_ID, photo=image, caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                    await bot.send_message(winner_id, 'Поздравляю вы победили в конкурсе!!!')
                 else:
+                    winner = random.choice(members)
                     await bot.send_photo(HOOPS_ID, photo=image,
-                                         caption='@all \n' + event[3] + f'\n Победил: @{random.choice(members)[1]}')
+                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
+                    await bot.send_message(winner[0], 'Поздравляю вы победили в конкурсе!!!')
         await asyncio.sleep(time)
 
 
