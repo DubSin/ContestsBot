@@ -130,7 +130,7 @@ async def password(message: types.Message, state: FSMContext):
 @dp.message(ContestState.text)
 async def password(message: types.Message, state: FSMContext):
     await state.update_data(text=message.text)
-    await message.answer('Прикрепите фото разыгрываемого лота')
+    await message.answer("Прикрепите фото разыгрываемого лота или пришлите '-' если фото отсутствует")
     await state.set_state(ContestState.image)
 
 
@@ -140,6 +140,10 @@ async def password(message: types.Message, state: FSMContext, bot: Bot):
         file_name = f"photos/{message.photo[-1].file_id}.jpg"
         await bot.download(message.photo[-1], destination=file_name)
         await state.update_data(image=f'{message.photo[-1].file_id}.jpg')
+        await message.answer('Это фейковый розыгрыш? Если да то напишите имя пользователя, если нет то напишите "n"')
+        await state.set_state(ContestState.fake)
+    elif message.text == '-':
+        await state.update_data(image='-')
         await message.answer('Это фейковый розыгрыш? Если да то напишите имя пользователя, если нет то напишите "n"')
         await state.set_state(ContestState.fake)
     else:
@@ -160,7 +164,10 @@ async def start_menu(message: types.Message):
     user_btn_1 = types.InlineKeyboardButton(text='Принять', callback_data='accept')
     user_btn_2 = types.InlineKeyboardButton(text='Отказать', callback_data='reject')
     user_markup = InlineKeyboardBuilder().add(user_btn_1).add(user_btn_2)
-    await message.answer('Хотите принять участие в конкурсе?', reply_markup=user_markup.as_markup())
+    if bot_db.event_exists():
+        await message.answer('Хотите принять участие в конкурсе?', reply_markup=user_markup.as_markup())
+    else:
+        await message.answer('Нет ближайших конурсов 😢')
 
 
 @dp.callback_query(F.data.startswith('accept'))
@@ -199,29 +206,37 @@ async def notifications(time, bot: Bot):
             delta = date - date.now()
             hours = delta.total_seconds() // 3600
             print(hours, delta.total_seconds())
-            if 0 < hours <= 3:
-                members = bot_db.get_members()
-                for i in members:
-                    user_id = i[0]
-                    await bot.send_message(user_id, f'Через {int(hours)} час(а) конурс')
-            if delta.total_seconds() == 0:
-                image = FSInputFile(f'photos/{event[4]}')
-                if event[2] != 'n':
-                    winner_id = bot_db.get_member_by_id(event[2])
-                    await bot.send_photo(HOOPS_ID, photo=image, caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                    await bot.send_message(winner_id, 'Поздравляю вы победили в конкурсе!!!')
+            if 0 <= delta.total_seconds() <= 100:
+                if event[4] != '-':
+                    image = FSInputFile(f'photos/{event[4]}')
+                    if event[2] != 'n':
+                        winner_id = bot_db.get_member_by_id(event[2])
+                        # await bot.send_photo(HOOPS_ID, photo=image, caption='@all \n' + event[3] + f'\n Победил: @{
+                        # event[2]}')
+                        await bot.send_message(winner_id, 'Поздравляю вы победили в конкурсе!!!')
+                    else:
+                        winner = random.choice(members)
+                        print(winner)
+                        # await bot.send_photo(HOOPS_ID, photo=image,
+                        # caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
+                        await bot.send_message(winner[0], 'Поздравляю вы победили в конкурсе!!!')
                 else:
-                    winner = random.choice(members)
-                    await bot.send_photo(HOOPS_ID, photo=image,
-                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
-                    await bot.send_message(winner[0], 'Поздравляю вы победили в конкурсе!!!')
+                    if event[2] != 'n':
+                        winner_id = bot_db.get_member_by_id(event[2])
+                        # await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                        await bot.send_message(winner_id, 'Поздравляю вы победили в конкурсе!!!')
+                    else:
+                        winner = random.choice(members)
+                        print(winner)
+                        # await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                        await bot.send_message(winner[0], 'Поздравляю вы победили в конкурсе!!!')
         await asyncio.sleep(time)
 
 
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN)
     loop = asyncio.get_event_loop()
-    loop.create_task(notifications(3600, bot))
+    loop.create_task(notifications(100, bot))
     await dp.start_polling(bot, skip_updates=True)
 
 
