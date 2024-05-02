@@ -208,29 +208,25 @@ async def notifications(time, bot: Bot):
             if 0 <= delta.total_seconds() <= 100:
                 if event[4] != '-' and event[2] != 'n':
                     image = FSInputFile(f'photos/{event[4]}')
-                    winner_id = bot_db.get_member_by_id(event[2])
-                    if winner_id:
-                        await bot.send_photo(int(winner_id[0]), photo=image, caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                    else:
-                        await bot.send_photo(ADMIN_ID, photo=image,
-                                             caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                        bot_db.del_event()
-
+                    await bot.send_photo(HOOPS_ID, photo=image,
+                                         caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                    await bot.send_photo(ADMIN_ID, photo=image,
+                                         caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                    bot_db.del_event()
                 elif event[4] != '-' and event[2] == 'n':
                     winner = random.choice(members)
                     image = FSInputFile(f'photos/{event[4]}')
-                    await bot.send_photo(int(winner[1]), photo=image, caption='@all \n' + event[3] + f'\n Победил: @{winner[2]}')
+                    await bot.send_photo(HOOPS_ID, photo=image,
+                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[2]}')
                     bot_db.del_event()
                 elif event[2] != 'n' and event[4] == '-':
-                    winner_id = bot_db.get_member_by_id(event[2])
-                    if winner_id:
-                        await bot.send_message(int(winner_id[0]), '@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                    else:
-                        await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                    await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                    await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
                     bot_db.del_event()
                 elif event[2] == 'n' and event[4] == '-':
                     winner = random.choice(members)
-                    await bot.send_message(int(winner[1]), '@all \n' + event[3] + f'\n Победил: @{winner[2]}')
+                    await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{winner[2]}')
+                    await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{winner[2]}')
                     bot_db.del_event()
         await asyncio.sleep(time)
 
