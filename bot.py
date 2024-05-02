@@ -218,6 +218,8 @@ async def notifications(time, bot: Bot):
                     image = FSInputFile(f'photos/{event[4]}')
                     await bot.send_photo(HOOPS_ID, photo=image,
                                          caption='@all \n' + event[3] + f'\n Победил: @{winner[2]}')
+                    await bot.send_photo(ADMIN_ID, photo=image,
+                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[2]}')
                     bot_db.del_event()
                 elif event[2] != 'n' and event[4] == '-':
                     await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
