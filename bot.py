@@ -217,9 +217,9 @@ async def notifications(time, bot: Bot):
                     winner = random.choice(members)
                     image = FSInputFile(f'photos/{event[4]}')
                     await bot.send_photo(HOOPS_ID, photo=image,
-                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[2]}')
+                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
                     await bot.send_photo(ADMIN_ID, photo=image,
-                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[2]}')
+                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
                     bot_db.del_event()
                 elif event[2] != 'n' and event[4] == '-':
                     await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
@@ -227,8 +227,8 @@ async def notifications(time, bot: Bot):
                     bot_db.del_event()
                 elif event[2] == 'n' and event[4] == '-':
                     winner = random.choice(members)
-                    await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{winner[2]}')
-                    await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{winner[2]}')
+                    await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{winner[1]}')
+                    await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{winner[1]}')
                     bot_db.del_event()
         await asyncio.sleep(time)
 
