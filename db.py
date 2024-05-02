@@ -41,5 +41,5 @@ class BoTDb:
         return result.fetchall()
 
     def get_member_by_id(self, user_name):
-        result = self.cursor.execute("SELECT user_id FROM `event_members` WHERE `user_name` = ", (user_name, ))
+        result = self.cursor.execute("SELECT user_id FROM `event_members` WHERE `user_name` = ?", (user_name,))
         return result.fetchone()

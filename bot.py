@@ -3,7 +3,7 @@ import asyncio
 import random
 import sys
 from datetime import datetime
-from keys import BOT_TOKEN, HOOPS_ID, PASSWORD
+from keys import BOT_TOKEN, HOOPS_ID, PASSWORD, ADMIN_ID
 from db import BoTDb
 from aiogram import F
 from aiogram.filters.callback_data import CallbackData
@@ -204,32 +204,34 @@ async def notifications(time, bot: Bot):
         if event and members:
             date = datetime.strptime(event[1], '%d/%m/%Y %H:%M')
             delta = date - date.now()
-            hours = delta.total_seconds() // 3600
-            print(hours, delta.total_seconds())
+            print(delta)
             if 0 <= delta.total_seconds() <= 100:
-                if event[4] != '-':
+                if event[4] != '-' and event[2] != 'n':
                     image = FSInputFile(f'photos/{event[4]}')
-                    if event[2] != 'n':
-                        winner_id = bot_db.get_member_by_id(event[2])
-                        # await bot.send_photo(HOOPS_ID, photo=image, caption='@all \n' + event[3] + f'\n Победил: @{
-                        # event[2]}')
-                        await bot.send_message(winner_id, 'Поздравляю вы победили в конкурсе!!!')
+                    winner_id = bot_db.get_member_by_id(event[2])
+                    if winner_id:
+                        await bot.send_photo(int(winner_id[0]), photo=image, caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
                     else:
-                        winner = random.choice(members)
-                        print(winner)
-                        # await bot.send_photo(HOOPS_ID, photo=image,
-                        # caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
-                        await bot.send_message(winner[0], 'Поздравляю вы победили в конкурсе!!!')
-                else:
-                    if event[2] != 'n':
-                        winner_id = bot_db.get_member_by_id(event[2])
-                        # await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                        await bot.send_message(winner_id, 'Поздравляю вы победили в конкурсе!!!')
+                        await bot.send_photo(ADMIN_ID, photo=image,
+                                             caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                        bot_db.del_event()
+
+                elif event[4] != '-' and event[2] == 'n':
+                    winner = random.choice(members)
+                    image = FSInputFile(f'photos/{event[4]}')
+                    await bot.send_photo(int(winner[1]), photo=image, caption='@all \n' + event[3] + f'\n Победил: @{winner[2]}')
+                    bot_db.del_event()
+                elif event[2] != 'n' and event[4] == '-':
+                    winner_id = bot_db.get_member_by_id(event[2])
+                    if winner_id:
+                        await bot.send_message(int(winner_id[0]), '@all \n' + event[3] + f'\n Победил: @{event[2]}')
                     else:
-                        winner = random.choice(members)
-                        print(winner)
-                        # await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                        await bot.send_message(winner[0], 'Поздравляю вы победили в конкурсе!!!')
+                        await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                    bot_db.del_event()
+                elif event[2] == 'n' and event[4] == '-':
+                    winner = random.choice(members)
+                    await bot.send_message(int(winner[1]), '@all \n' + event[3] + f'\n Победил: @{winner[2]}')
+                    bot_db.del_event()
         await asyncio.sleep(time)
 
 
