@@ -33,7 +33,7 @@ admin_btn_4 = types.InlineKeyboardButton(text='Текущие участники
 admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2).add(admin_btn_3).add(admin_btn_4)
 
 channel_btn_1 = types.InlineKeyboardButton(text='Принять участие', callback_data='channel_accept')
-channel_markup = InlineKeyboardBuilder().add()
+channel_markup = InlineKeyboardBuilder().add(channel_btn_1)
 
 
 class EnterState(StatesGroup):
