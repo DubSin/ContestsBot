@@ -4,7 +4,7 @@ import random
 import sys
 import shutil
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from keys import BOT_TOKEN, HOOPS_ID, PASSWORD, ADMIN_ID
 from db import BoTDb
 from aiogram.methods import DeleteWebhook
@@ -224,9 +224,9 @@ async def notifications(time, bot: Bot):
         members = bot_db.get_members()
         if event and members:
             date = datetime.strptime(event[1], '%d/%m/%Y %H:%M')
-            delta = date - date.now()
+            delta = date - (datetime.now() + timedelta(hours=3))
             print(delta)
-            if 0 <= delta.total_seconds() <= 1000:
+            if 0 <= delta.total_seconds() <= time:
                 if event[4] != '-' and event[2] != 'n':
                     image = FSInputFile(f'photos/{event[4]}')
                     await bot.send_photo(HOOPS_ID, photo=image,
@@ -261,7 +261,7 @@ async def del_photos(folder_path):
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN)
     loop = asyncio.get_event_loop()
-    loop.create_task(notifications(1000, bot))
+    loop.create_task(notifications(100, bot))
     await bot(DeleteWebhook(drop_pending_updates=True))
     await dp.start_polling(bot)
 
