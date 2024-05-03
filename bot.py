@@ -2,9 +2,12 @@ import logging
 import asyncio
 import random
 import sys
+import shutil
+import os
 from datetime import datetime
 from keys import BOT_TOKEN, HOOPS_ID, PASSWORD, ADMIN_ID
 from db import BoTDb
+from aiogram.methods import DeleteWebhook
 from aiogram import F
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -18,6 +21,19 @@ from aiogram.types import FSInputFile
 
 bot_db = BoTDb('participants.db')
 dp = Dispatcher(storage=MemoryStorage())
+
+user_btn_1 = types.InlineKeyboardButton(text='Принять', callback_data='accept')
+user_btn_2 = types.InlineKeyboardButton(text='Отказать', callback_data='reject')
+user_markup = InlineKeyboardBuilder().add(user_btn_1).add(user_btn_2)
+
+admin_btn_1 = types.InlineKeyboardButton(text='Создать новый розыгрыш', callback_data='event')
+admin_btn_2 = types.InlineKeyboardButton(text='Удалить текущий розыгрыш', callback_data='del_event')
+admin_btn_3 = types.InlineKeyboardButton(text='Текущий розыгрыш', callback_data='details')
+admin_btn_4 = types.InlineKeyboardButton(text='Текущие участники', callback_data='members')
+admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2).add(admin_btn_3).add(admin_btn_4)
+
+channel_btn_1 = types.InlineKeyboardButton(text='Принять участие', callback_data='channel_accept')
+channel_markup = InlineKeyboardBuilder().add()
 
 
 class EnterState(StatesGroup):
@@ -42,11 +58,6 @@ async def password(message: types.Message, state: FSMContext):
     await state.update_data(password=message.text)
     dat = await state.get_data()
     if dat['password'] == PASSWORD:
-        admin_btn_1 = types.InlineKeyboardButton(text='Создать новый розыгрыш', callback_data='event')
-        admin_btn_2 = types.InlineKeyboardButton(text='Удалить текущий розыгрыш', callback_data='del_event')
-        admin_btn_3 = types.InlineKeyboardButton(text='Текущий розыгрыш', callback_data='details')
-        admin_btn_4 = types.InlineKeyboardButton(text='Текущие участники', callback_data='members')
-        admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2).add(admin_btn_3).add(admin_btn_4)
         await message.answer('Приветствую в панели админа ', reply_markup=admin_markup.as_markup())
         await state.clear()
     else:
@@ -151,23 +162,33 @@ async def password(message: types.Message, state: FSMContext, bot: Bot):
 
 
 @dp.message(ContestState.fake)
-async def password(message: types.Message, state: FSMContext):
+async def password(message: types.Message, state: FSMContext, bot: Bot):
     await state.update_data(fake=message.text)
     dat = await state.get_data()
     bot_db.add_event(dat['date'], dat['time'], dat['text'], dat['image'], dat['fake'])
     await message.answer('Все готово')
+    await bot.send_message(HOOPS_ID, f'@all \n Внимание!!! {dat["text"]} \n'
+                                     f'Дата и время: {dat["date"]} в {dat["time"]}',
+                           reply_markup=channel_markup.as_markup())
     await state.clear()
 
 
 @dp.message(Command(commands=["start"]))
 async def start_menu(message: types.Message):
-    user_btn_1 = types.InlineKeyboardButton(text='Принять', callback_data='accept')
-    user_btn_2 = types.InlineKeyboardButton(text='Отказать', callback_data='reject')
-    user_markup = InlineKeyboardBuilder().add(user_btn_1).add(user_btn_2)
     if bot_db.event_exists():
         await message.answer('Хотите принять участие в конкурсе?', reply_markup=user_markup.as_markup())
     else:
         await message.answer('Нет ближайших конурсов 😢')
+
+
+@dp.callback_query(F.data.startswith('channel_accept'))
+async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=None)
+    bot_db.add_user(callback_query.from_user.id, callback_query.from_user.username)
 
 
 @dp.callback_query(F.data.startswith('accept'))
@@ -205,14 +226,14 @@ async def notifications(time, bot: Bot):
             date = datetime.strptime(event[1], '%d/%m/%Y %H:%M')
             delta = date - date.now()
             print(delta)
-            if 0 <= delta.total_seconds() <= 100:
+            if 0 <= delta.total_seconds() <= 1000:
                 if event[4] != '-' and event[2] != 'n':
                     image = FSInputFile(f'photos/{event[4]}')
                     await bot.send_photo(HOOPS_ID, photo=image,
                                          caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
                     await bot.send_photo(ADMIN_ID, photo=image,
                                          caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                    bot_db.del_event()
+                    await del_photos(f'photos/{event[4]}')
                 elif event[4] != '-' and event[2] == 'n':
                     winner = random.choice(members)
                     image = FSInputFile(f'photos/{event[4]}')
@@ -220,24 +241,29 @@ async def notifications(time, bot: Bot):
                                          caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
                     await bot.send_photo(ADMIN_ID, photo=image,
                                          caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
-                    bot_db.del_event()
+                    await del_photos(f'photos/{event[4]}')
                 elif event[2] != 'n' and event[4] == '-':
                     await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
                     await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                    bot_db.del_event()
                 elif event[2] == 'n' and event[4] == '-':
                     winner = random.choice(members)
                     await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{winner[1]}')
                     await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{winner[1]}')
-                    bot_db.del_event()
+                bot_db.del_event()
         await asyncio.sleep(time)
+
+
+async def del_photos(folder_path):
+    shutil.rmtree(folder_path)
+    os.mkdir(folder_path)
 
 
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN)
     loop = asyncio.get_event_loop()
-    loop.create_task(notifications(100, bot))
-    await dp.start_polling(bot, skip_updates=True)
+    loop.create_task(notifications(1000, bot))
+    await bot(DeleteWebhook(drop_pending_updates=True))
+    await dp.start_polling(bot)
 
 
 if '__main__' == __name__:
