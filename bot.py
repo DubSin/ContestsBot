@@ -261,7 +261,7 @@ async def del_photos(folder_path):
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN)
     loop = asyncio.get_event_loop()
-    loop.create_task(notifications(1000, bot))
+    loop.create_task(notifications(100, bot))
     await bot(DeleteWebhook(drop_pending_updates=True))
     await dp.start_polling(bot)
 
