@@ -32,7 +32,7 @@ admin_btn_3 = types.InlineKeyboardButton(text='Текущий розыгрыш',
 admin_btn_4 = types.InlineKeyboardButton(text='Текущие участники', callback_data='members')
 admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2).add(admin_btn_3).add(admin_btn_4)
 
-channel_btn_1 = types.InlineKeyboardButton(text='Принять участие', callback_data='channel_accept')
+channel_btn_1 = types.InlineKeyboardButton(text='Принять участие', url='https://t.me/Hoops_shop_bot')
 channel_markup = InlineKeyboardBuilder().add(channel_btn_1)
 
 
@@ -185,16 +185,6 @@ async def start_menu(message: types.Message):
         await message.answer('Хотите принять участие в конкурсе?', reply_markup=user_markup.as_markup())
     else:
         await message.answer('Нет ближайших конурсов 😢')
-
-
-@dp.callback_query(F.data.startswith('channel_accept'))
-async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
-    await bot.answer_callback_query(callback_query.id)
-    await bot.edit_message_reply_markup(
-        chat_id=callback_query.from_user.id,
-        message_id=callback_query.message.message_id,
-        reply_markup=None)
-    bot_db.add_user(callback_query.from_user.id, callback_query.from_user.username)
 
 
 @dp.callback_query(F.data.startswith('accept'))
