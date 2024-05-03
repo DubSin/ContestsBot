@@ -167,9 +167,15 @@ async def password(message: types.Message, state: FSMContext, bot: Bot):
     dat = await state.get_data()
     bot_db.add_event(dat['date'], dat['time'], dat['text'], dat['image'], dat['fake'])
     await message.answer('Все готово')
-    await bot.send_message(HOOPS_ID, f'@all \n Внимание!!! {dat["text"]} \n'
-                                     f'Дата и время: {dat["date"]} в {dat["time"]}',
-                           reply_markup=channel_markup.as_markup())
+    if dat['image'] != '-':
+        image = FSInputFile(f'photos/{dat["image"]}')
+        await bot.send_photo(HOOPS_ID, photo=image, caption=f'@all \n Внимание!!! {dat["text"]} \n'
+                                                            f'Дата и время: {dat["date"]} в {dat["time"]}',
+                             reply_markup=channel_markup.as_markup())
+    else:
+        await bot.send_message(HOOPS_ID, f'@all \n Внимание!!! {dat["text"]} \n'
+                                         f'Дата и время: {dat["date"]} в {dat["time"]}',
+                               reply_markup=channel_markup.as_markup())
     await state.clear()
 
 
