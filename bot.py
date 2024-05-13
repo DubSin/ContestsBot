@@ -18,6 +18,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile
+from aiogram.methods.get_chat_member import GetChatMember, ChatMemberMember
 
 bot_db = BoTDb('participants.db')
 dp = Dispatcher(storage=MemoryStorage())
@@ -180,11 +181,15 @@ async def password(message: types.Message, state: FSMContext, bot: Bot):
 
 
 @dp.message(Command(commands=["start"]))
-async def start_menu(message: types.Message):
-    if bot_db.event_exists():
-        await message.answer('Хотите принять участие в конкурсе?', reply_markup=user_markup.as_markup())
+async def start_menu(message: types.Message, bot: Bot):
+    user_status = await bot.get_chat_member(chat_id=HOOPS_ID, user_id=message.from_user.id)
+    if isinstance(user_status, ChatMemberMember):
+        if bot_db.event_exists():
+            await message.answer('Хотите принять участие в конкурсе?', reply_markup=user_markup.as_markup())
+        else:
+            await message.answer('Нет ближайших конурсов 😢')
     else:
-        await message.answer('Нет ближайших конурсов 😢')
+        await message.answer('Вы не подписаны 🤬')
 
 
 @dp.callback_query(F.data.startswith('accept'))
