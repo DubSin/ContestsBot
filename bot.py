@@ -37,10 +37,6 @@ channel_btn_1 = types.InlineKeyboardButton(text='Принять участие',
 channel_markup = InlineKeyboardBuilder().add(channel_btn_1)
 
 
-class EnterState(StatesGroup):
-    password = State()
-
-
 class ContestState(StatesGroup):
     time = State()
     text = State()
@@ -48,21 +44,20 @@ class ContestState(StatesGroup):
     fake = State()
 
 
+def is_admin(admin_list, message):
+    admin_status = False
+    for admin in admin_list:
+        if admin.user.id == message.from_user.id:
+            admin_status = True
+            break
+    return admin_status
+
+
 @dp.message(Command(commands=["admin"]))
-async def start_menu(message: types.Message, state: FSMContext):
-    await message.answer('Введите пароль:')
-    await state.set_state(EnterState.password)
-
-
-@dp.message(EnterState.password)
-async def password(message: types.Message, state: FSMContext):
-    await state.update_data(password=message.text)
-    dat = await state.get_data()
-    if dat['password'] == PASSWORD:
+async def start_menu(message: types.Message, bot: Bot):
+    admins = await bot.get_chat_administrators(chat_id=HOOPS_ID)
+    if is_admin(admins, message) or message.from_user.id == ADMIN_ID:
         await message.answer('Приветствую в панели админа ', reply_markup=admin_markup.as_markup())
-        await state.clear()
-    else:
-        await message.answer('Неправильный пароль')
 
 
 @dp.callback_query(F.data == 'details')
@@ -183,7 +178,8 @@ async def password(message: types.Message, state: FSMContext, bot: Bot):
 @dp.message(Command(commands=["start"]))
 async def start_menu(message: types.Message, bot: Bot):
     user_status = await bot.get_chat_member(chat_id=HOOPS_ID, user_id=message.from_user.id)
-    if isinstance(user_status, ChatMemberMember):
+    admins = await bot.get_chat_administrators(chat_id=HOOPS_ID)
+    if isinstance(user_status, ChatMemberMember) or is_admin(admins, message):
         if bot_db.event_exists():
             await message.answer('Хотите принять участие в конкурсе?', reply_markup=user_markup.as_markup())
         else:
