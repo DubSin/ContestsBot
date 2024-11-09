@@ -5,7 +5,7 @@ import sys
 import shutil
 import os
 from datetime import datetime, timedelta
-from keys import BOT_TOKEN, HOOPS_ID, PASSWORD, ADMIN_ID
+import keys
 from db import BoTDb
 from aiogram.methods import DeleteWebhook
 from aiogram import F
@@ -19,6 +19,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile
 from aiogram.methods.get_chat_member import GetChatMember, ChatMemberMember
+from utlits import get_chat_members
 
 bot_db = BoTDb('participants.db')
 dp = Dispatcher(storage=MemoryStorage())
@@ -31,7 +32,9 @@ admin_btn_1 = types.InlineKeyboardButton(text='Создать новый роз�
 admin_btn_2 = types.InlineKeyboardButton(text='Удалить текущий розыгрыш', callback_data='del_event')
 admin_btn_3 = types.InlineKeyboardButton(text='Текущий розыгрыш', callback_data='details')
 admin_btn_4 = types.InlineKeyboardButton(text='Текущие участники', callback_data='members')
-admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2).add(admin_btn_3).add(admin_btn_4)
+admin_btn_5 = types.InlineKeyboardButton(text='Написать всем подписчикам', callback_data='send_to_all')
+admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2).add(admin_btn_3).add(admin_btn_4)\
+    .add(admin_btn_5)
 
 channel_btn_1 = types.InlineKeyboardButton(text='Принять участие', url='https://t.me/Hoops_shop_bot')
 channel_markup = InlineKeyboardBuilder().add(channel_btn_1)
@@ -42,6 +45,13 @@ class ContestState(StatesGroup):
     text = State()
     image = State()
     fake = State()
+    after_text = State()
+
+
+class SendMembers(StatesGroup):
+    text = State()
+    photo = State()
+    contest = State()
 
 
 def is_admin(admin_list, message):
@@ -55,8 +65,8 @@ def is_admin(admin_list, message):
 
 @dp.message(Command(commands=["admin"]))
 async def start_menu(message: types.Message, bot: Bot):
-    admins = await bot.get_chat_administrators(chat_id=HOOPS_ID)
-    if is_admin(admins, message) or message.from_user.id == ADMIN_ID:
+    admins = await bot.get_chat_administrators(chat_id=keys.HOOPS_ID)
+    if is_admin(admins, message) or message.from_user.id == keys.ADMIN_ID:
         await message.answer('Приветствую в панели админа ', reply_markup=admin_markup.as_markup())
 
 
@@ -135,14 +145,14 @@ async def password(message: types.Message, state: FSMContext):
 
 
 @dp.message(ContestState.text)
-async def password(message: types.Message, state: FSMContext):
+async def text(message: types.Message, state: FSMContext):
     await state.update_data(text=message.text)
     await message.answer("Прикрепите фото разыгрываемого лота или пришлите '-' если фото отсутствует")
     await state.set_state(ContestState.image)
 
 
 @dp.message(ContestState.image)
-async def password(message: types.Message, state: FSMContext, bot: Bot):
+async def photo(message: types.Message, state: FSMContext, bot: Bot):
     if message.photo:
         file_name = f"photos/{message.photo[-1].file_id}.jpg"
         await bot.download(message.photo[-1], destination=file_name)
@@ -158,27 +168,72 @@ async def password(message: types.Message, state: FSMContext, bot: Bot):
 
 
 @dp.message(ContestState.fake)
-async def password(message: types.Message, state: FSMContext, bot: Bot):
+async def fake(message: types.Message, state: FSMContext, bot: Bot):
     await state.update_data(fake=message.text)
+    await message.answer("Отлично! Теперь введите сообщение победителю")
+    await state.set_state(ContestState.after_text)
+
+
+@dp.message(ContestState.after_text)
+async def fake(message: types.Message, state: FSMContext, bot: Bot):
+    await state.update_data(after_text=message.text)
     dat = await state.get_data()
-    bot_db.add_event(dat['date'], dat['time'], dat['text'], dat['image'], dat['fake'])
+    bot_db.add_event(dat['date'], dat['time'], dat['text'], dat['image'], dat['fake'], dat['after_text'])
     await message.answer('Все готово')
     if dat['image'] != '-':
         image = FSInputFile(f'photos/{dat["image"]}')
-        await bot.send_photo(HOOPS_ID, photo=image, caption=f'@all \n Внимание!!! {dat["text"]} \n'
-                                                            f'Дата и время: {dat["date"]} в {dat["time"]}',
+        await bot.send_photo(keys.HOOPS_ID, photo=image, caption=f'Внимание!!! {dat["text"]} \n'
+                                                                 f'Дата и время: {dat["date"]} в {dat["time"]}',
                              reply_markup=channel_markup.as_markup())
     else:
-        await bot.send_message(HOOPS_ID, f'@all \n Внимание!!! {dat["text"]} \n'
-                                         f'Дата и время: {dat["date"]} в {dat["time"]}',
+        await bot.send_message(keys.HOOPS_ID, f'Внимание!!! {dat["text"]} \n'
+                                              f'Дата и время: {dat["date"]} в {dat["time"]}',
                                reply_markup=channel_markup.as_markup())
+    await state.clear()
+
+
+@dp.callback_query(F.data == 'send_to_all')
+async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot, state: FSMContext):
+    await bot.answer_callback_query(callback_query.id)
+    await callback_query.message.answer("Введите какой текст хотите отправить всем участникам группы Hoops")
+    await state.set_state(SendMembers.text)
+
+
+@dp.message(SendMembers.text)
+async def send_text(message: types.Message, state: FSMContext):
+    await state.update_data(text=message.text)
+    await message.answer("Добавьте фотографии (напишите '-', если не хотите добавлять)")
+    await state.set_state(SendMembers.photo)
+
+
+@dp.message(SendMembers.photo)
+async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
+    members = await get_chat_members(keys.HOOPS_CHAT_ID)
+    for i in members:
+        print(i)
+    if message.photo:
+        file_name = f"photos/{message.photo[-1].file_id}.jpg"
+        await bot.download(message.photo[-1], destination=file_name)
+        await state.update_data(photo=f'{message.photo[-1].file_id}.jpg')
+        dat = await state.get_data()
+        image = FSInputFile(f'photos/{dat["photo"]}')
+        for member in members:
+            await bot.send_photo(member, photo=image, caption=dat['text'])
+    elif message.text == '-':
+        await state.update_data(photo='-')
+        dat = await state.get_data()
+        for member in members:
+            await bot.send_message(member, dat['text'])
+    else:
+        await message.answer('Это не фото')
+    await message.answer('Сообщение успешное отправлено')
     await state.clear()
 
 
 @dp.message(Command(commands=["start"]))
 async def start_menu(message: types.Message, bot: Bot):
-    user_status = await bot.get_chat_member(chat_id=HOOPS_ID, user_id=message.from_user.id)
-    admins = await bot.get_chat_administrators(chat_id=HOOPS_ID)
+    user_status = await bot.get_chat_member(chat_id=keys.HOOPS_ID, user_id=message.from_user.id)
+    admins = await bot.get_chat_administrators(chat_id=keys.HOOPS_ID)
     if isinstance(user_status, ChatMemberMember) or is_admin(admins, message):
         if bot_db.event_exists():
             await message.answer('Хотите принять участие в конкурсе?', reply_markup=user_markup.as_markup())
@@ -226,26 +281,26 @@ async def notifications(time, bot: Bot):
             if 0 <= delta.total_seconds() <= time:
                 if event[4] != '-' and event[2] != 'n':
                     image = FSInputFile(f'photos/{event[4]}')
-                    await bot.send_photo(HOOPS_ID, photo=image,
-                                         caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                    await bot.send_photo(ADMIN_ID, photo=image,
-                                         caption='@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                    await bot.send_photo(keys.HOOPS_ID, photo=image,
+                                         caption=f'Победил: @{event[2]}\n' + event[-1])
+                    await bot.send_photo(keys.ADMIN_ID, photo=image,
+                                         caption=f'Победил: @{event[2]}\n' + event[-1])
                     await del_photos(f'photos/{event[4]}')
                 elif event[4] != '-' and event[2] == 'n':
                     winner = random.choice(members)
                     image = FSInputFile(f'photos/{event[4]}')
-                    await bot.send_photo(HOOPS_ID, photo=image,
-                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
-                    await bot.send_photo(ADMIN_ID, photo=image,
-                                         caption='@all \n' + event[3] + f'\n Победил: @{winner[1]}')
+                    await bot.send_photo(keys.HOOPS_ID, photo=image,
+                                         caption=f'Победил: @{winner[1]}\n' + event[-1])
+                    await bot.send_photo(keys.ADMIN_ID, photo=image,
+                                         caption=f'Победил: @{winner[1]}\n' + event[-1])
                     await del_photos(f'photos/{event[4]}')
                 elif event[2] != 'n' and event[4] == '-':
-                    await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
-                    await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{event[2]}')
+                    await bot.send_message(keys.HOOPS_ID, f'Победил: @{event[2]}\n' + event[-1])
+                    await bot.send_message(keys.ADMIN_ID, f'Победил: @{event[2]}\n' + event[-1])
                 elif event[2] == 'n' and event[4] == '-':
                     winner = random.choice(members)
-                    await bot.send_message(HOOPS_ID, '@all \n' + event[3] + f'\n Победил: @{winner[1]}')
-                    await bot.send_message(ADMIN_ID, '@all \n' + event[3] + f'\n Победил: @{winner[1]}')
+                    await bot.send_message(keys.HOOPS_ID, f'Победил: @{winner[1]}\n' + event[-1])
+                    await bot.send_message(keys.ADMIN_ID, f'Победил: @{winner[1]}\n' + event[-1])
                 bot_db.del_event()
         await asyncio.sleep(time)
 
@@ -256,7 +311,7 @@ async def del_photos(folder_path):
 
 
 async def main() -> None:
-    bot = Bot(token=BOT_TOKEN)
+    bot = Bot(token=keys.BOT_TOKEN)
     loop = asyncio.get_event_loop()
     loop.create_task(notifications(100, bot))
     await bot(DeleteWebhook(drop_pending_updates=True))
