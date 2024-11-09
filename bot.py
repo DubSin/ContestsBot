@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import keys
 from db import BoTDb
 from aiogram.methods import DeleteWebhook
-from aiogram import F
+from aiogram import F, exceptions
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram3_calendar import SimpleCalendar, simple_cal_callback
@@ -209,24 +209,27 @@ async def send_text(message: types.Message, state: FSMContext):
 @dp.message(SendMembers.photo)
 async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
     members = await get_chat_members(keys.HOOPS_CHAT_ID)
-    for i in members:
-        print(i)
-    if message.photo:
-        file_name = f"photos/{message.photo[-1].file_id}.jpg"
-        await bot.download(message.photo[-1], destination=file_name)
-        await state.update_data(photo=f'{message.photo[-1].file_id}.jpg')
-        dat = await state.get_data()
-        image = FSInputFile(f'photos/{dat["photo"]}')
-        for member in members:
-            await bot.send_photo(member, photo=image, caption=dat['text'])
-    elif message.text == '-':
-        await state.update_data(photo='-')
-        dat = await state.get_data()
-        for member in members:
-            await bot.send_message(member, dat['text'])
-    else:
-        await message.answer('Это не фото')
-    await message.answer('Сообщение успешное отправлено')
+    try:
+        for i in members:
+            print(i)
+        if message.photo:
+            file_name = f"photos/{message.photo[-1].file_id}.jpg"
+            await bot.download(message.photo[-1], destination=file_name)
+            await state.update_data(photo=f'{message.photo[-1].file_id}.jpg')
+            dat = await state.get_data()
+            image = FSInputFile(f'photos/{dat["photo"]}')
+            for member in members:
+                await bot.send_photo(member, photo=image, caption=dat['text'])
+        elif message.text == '-':
+            await state.update_data(photo='-')
+            dat = await state.get_data()
+            for member in members:
+                await bot.send_message(member, dat['text'])
+        else:
+            await message.answer('Это не фото')
+        await message.answer('Сообщение успешное отправлено')
+    except exceptions.TelegramForbiddenError:
+        pass
     await state.clear()
 
 
@@ -279,6 +282,7 @@ async def notifications(time, bot: Bot):
             delta = date - (datetime.now() + timedelta(hours=3))
             print(delta)
             if 0 <= delta.total_seconds() <= time:
+                print('yea ')
                 if event[4] != '-' and event[2] != 'n':
                     image = FSInputFile(f'photos/{event[4]}')
                     await bot.send_photo(keys.HOOPS_ID, photo=image,
@@ -313,7 +317,7 @@ async def del_photos(folder_path):
 async def main() -> None:
     bot = Bot(token=keys.BOT_TOKEN)
     loop = asyncio.get_event_loop()
-    loop.create_task(notifications(100, bot))
+    loop.create_task(notifications(60, bot))
     await bot(DeleteWebhook(drop_pending_updates=True))
     await dp.start_polling(bot)
 
