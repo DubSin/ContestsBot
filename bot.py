@@ -14,30 +14,77 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram3_calendar import SimpleCalendar, simple_cal_callback
 from aiogram import Dispatcher, Bot, types
 from aiogram.filters.command import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.types import FSInputFile
-from aiogram.methods.get_chat_member import GetChatMember, ChatMemberMember
-from utlits import get_chat_members
+from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, \
+    ReplyKeyboardRemove, KeyboardButton
+from aiogram.methods.get_chat_member import ChatMemberMember
+from utlits import get_chat_members, get_channel_members
+from currency import Currency
 
 bot_db = BoTDb('participants.db')
 dp = Dispatcher(storage=MemoryStorage())
 
-user_btn_1 = types.InlineKeyboardButton(text='Принять', callback_data='accept')
-user_btn_2 = types.InlineKeyboardButton(text='Отказать', callback_data='reject')
-user_markup = InlineKeyboardBuilder().add(user_btn_1).add(user_btn_2)
+admin_markup = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text='Создать новый розыгрыш', callback_data='event')],
+                     [InlineKeyboardButton(text='Удалить текущий розыгрыш', callback_data='del_event')],
+                     [InlineKeyboardButton(text='Текущий розыгрыш', callback_data='details')],
+                     [InlineKeyboardButton(text='Текущие участники', callback_data='members')],
+                     [InlineKeyboardButton(text='Написать всем подписчикам', callback_data='send_to_all')]
+                     ])
 
-admin_btn_1 = types.InlineKeyboardButton(text='Создать новый розыгрыш', callback_data='event')
-admin_btn_2 = types.InlineKeyboardButton(text='Удалить текущий розыгрыш', callback_data='del_event')
-admin_btn_3 = types.InlineKeyboardButton(text='Текущий розыгрыш', callback_data='details')
-admin_btn_4 = types.InlineKeyboardButton(text='Текущие участники', callback_data='members')
-admin_btn_5 = types.InlineKeyboardButton(text='Написать всем подписчикам', callback_data='send_to_all')
-admin_markup = InlineKeyboardBuilder().add(admin_btn_1).add(admin_btn_2).add(admin_btn_3).add(admin_btn_4)\
-    .add(admin_btn_5)
+main_menu = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text="Оформить/Рассчитать заказ", callback_data='order')],
+                     [InlineKeyboardButton(text="Участвовать в конкурсе ", callback_data='contest')],
+                     [InlineKeyboardButton(text="Узнать курс юаня", callback_data='currency')],
+                     [InlineKeyboardButton(text="Написать отзыв", callback_data='feedback')],
+                     [InlineKeyboardButton(text="Срок доставки", callback_data='delivery_time')],
+                     [InlineKeyboardButton(text="Написать менеджеру", callback_data='manager')]])
 
-channel_btn_1 = types.InlineKeyboardButton(text='Принять участие', url='https://t.me/Hoops_shop_bot')
-channel_markup = InlineKeyboardBuilder().add(channel_btn_1)
+back_markup = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
+
+feedback_markup = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text='Оставить отзыв', url='https://t.me/hoops_reaction')],
+                     [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
+
+manager_markup = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text='Написать менеджеру', url='https://t.me/raketka_228')],
+                     [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
+channel_markup = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text='Принять участие', url='https://t.me/Hoops_shop_bot')]])
+
+keyboard = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить расчет")]], resize_keyboard=True)
+
+product_markup = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text="Кроссовки👟", callback_data="prod_sneakers"),
+                      InlineKeyboardButton(text="Зимняя обувь🥾👢", callback_data="prod_winter_shoes")],
+                     [InlineKeyboardButton(text="Штаны (джинсы, спортивки)", callback_data="prod_pants"),
+                      InlineKeyboardButton(text="Шорты🩳", callback_data="prod_shorts")],
+                     [InlineKeyboardButton(text="Футболки и Рубашки👕👔", callback_data="prod_shirts")],
+                     [InlineKeyboardButton(text="Мячи🏀", callback_data="prod_balls"),
+                      InlineKeyboardButton(text="Украшения👑", callback_data="prod_decors"),
+                      InlineKeyboardButton(text="Парфюмы🌷", callback_data="prod_perfumes")],
+                     [InlineKeyboardButton(text="Кофты и свитера🩳", callback_data="prod_sweatshirts"),
+                      InlineKeyboardButton(text="Верхняя одежда🧥", callback_data="prod_jacket")],
+                     [InlineKeyboardButton(text="Нижнее белье👙🧦", callback_data="prod_underwear"),
+                      InlineKeyboardButton(text="Аксессуары🧢🧤", callback_data="prod_accessories")],
+                     [InlineKeyboardButton(text="Маленькая сумка 👛", callback_data="prod_small_bag")],
+                     [InlineKeyboardButton(text="Большая сумка/Рюкзак 🧳🎒", callback_data="prod_big_bag")],
+                     [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
+
+order_markup = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text="Расчитать еще", callback_data="order")],
+                     [InlineKeyboardButton(text="Заказать", callback_data="manager_order")],
+                     [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
+
+prod_dict = {"prod_sneakers": ['Кросовки', 0.5], "prod_winter_shoes": ['Зимняя обувь', 0.5],
+             "prod_pants": ['Штаны', 0.5], "prod_shorts": ['Шорты', 0.5],
+             "prod_shirts": ['Футболки и Рубашки', 0.5], "prod_balls": ['Мячи', 0.5],
+             "prod_decors": ['Украшения', 0.5], "prod_perfumes": ['Парфюмы', 0.5],
+             "prod_sweatshirts": ['Кофты и свитера🩳', 0.5], "prod_jacket": ['Верхняя одежда', 0.5],
+             "prod_underwear": ['Нижнее белье', 0.5], "prod_accessories": ['Аксессуары', 0.5],
+             "prod_small_bag": ['Маленькая сумка', 0.5], "prod_big_bag": ['Большая сумка/Рюкзак', 0.5]}
 
 
 class ContestState(StatesGroup):
@@ -54,6 +101,16 @@ class SendMembers(StatesGroup):
     contest = State()
 
 
+class OrderStates(StatesGroup):
+    category = State()
+    price = State()
+    address = State()
+    link = State()
+    size = State()
+    name = State()
+    phone = State()
+
+
 def is_admin(admin_list, message):
     admin_status = False
     for admin in admin_list:
@@ -67,7 +124,7 @@ def is_admin(admin_list, message):
 async def start_menu(message: types.Message, bot: Bot):
     admins = await bot.get_chat_administrators(chat_id=keys.HOOPS_ID)
     if is_admin(admins, message) or message.from_user.id == keys.ADMIN_ID:
-        await message.answer('Приветствую в панели админа ', reply_markup=admin_markup.as_markup())
+        await message.answer('Приветствую в панели админа ', reply_markup=admin_markup)
 
 
 @dp.callback_query(F.data == 'details')
@@ -184,11 +241,11 @@ async def fake(message: types.Message, state: FSMContext, bot: Bot):
         image = FSInputFile(f'photos/{dat["image"]}')
         await bot.send_photo(keys.HOOPS_ID, photo=image, caption=f'Внимание!!! {dat["text"]} \n'
                                                                  f'Дата и время: {dat["date"]} в {dat["time"]}',
-                             reply_markup=channel_markup.as_markup())
+                             reply_markup=channel_markup)
     else:
         await bot.send_message(keys.HOOPS_ID, f'Внимание!!! {dat["text"]} \n'
                                               f'Дата и время: {dat["date"]} в {dat["time"]}',
-                               reply_markup=channel_markup.as_markup())
+                               reply_markup=channel_markup)
     await state.clear()
 
 
@@ -208,7 +265,9 @@ async def send_text(message: types.Message, state: FSMContext):
 
 @dp.message(SendMembers.photo)
 async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
-    members = await get_chat_members(keys.HOOPS_CHAT_ID)
+    feedback_members = await get_chat_members(keys.HOOPS_CHAT_ID)
+    channel_members = await get_channel_members(keys.HOOPS_ID)
+    members = set(feedback_members + channel_members)
     try:
         for i in members:
             print(i)
@@ -234,43 +293,201 @@ async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
 
 
 @dp.message(Command(commands=["start"]))
-async def start_menu(message: types.Message, bot: Bot):
-    user_status = await bot.get_chat_member(chat_id=keys.HOOPS_ID, user_id=message.from_user.id)
+async def start_menu(message: types.Message):
+    await message.answer("Привествую, я Hoops Shop Bot", reply_markup=main_menu)
+
+
+@dp.callback_query(F.data == "contest")
+async def contest_menu(callback_query: types.CallbackQuery, bot: Bot):
+    user_status = await bot.get_chat_member(chat_id=keys.HOOPS_ID, user_id=callback_query.from_user.id)
     admins = await bot.get_chat_administrators(chat_id=keys.HOOPS_ID)
-    if isinstance(user_status, ChatMemberMember) or is_admin(admins, message):
+    if isinstance(user_status, ChatMemberMember) or is_admin(admins, callback_query):
         if bot_db.event_exists():
-            await message.answer('Хотите принять участие в конкурсе?', reply_markup=user_markup.as_markup())
+            bot_db.add_user(callback_query.from_user.id, callback_query.from_user.username)
+            await bot.edit_message_text(
+                chat_id=callback_query.from_user.id,
+                message_id=callback_query.message.message_id,
+                text='Теперь Вы участвуете в конкурсе. Удачи🤞🍀')
+            await bot.edit_message_reply_markup(
+                chat_id=callback_query.from_user.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=back_markup)
         else:
-            await message.answer('Нет ближайших конурсов 😢')
+            await bot.edit_message_text(
+                chat_id=callback_query.from_user.id,
+                message_id=callback_query.message.message_id,
+                text='Нет ближайших конурсов 😢')
+            await bot.edit_message_reply_markup(
+                chat_id=callback_query.from_user.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=back_markup)
     else:
-        await message.answer('Вы не подписаны 🤬')
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text='Вы не подписаны 🤬')
+        await bot.edit_message_reply_markup(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            reply_markup=back_markup)
 
 
-@dp.callback_query(F.data.startswith('accept'))
-async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
-    await bot.answer_callback_query(callback_query.id)
-    await bot.edit_message_reply_markup(
-        chat_id=callback_query.from_user.id,
-        message_id=callback_query.message.message_id,
-        reply_markup=None)
+@dp.callback_query(F.data == "feedback")
+async def feedback_menu(callback_query: types.CallbackQuery, bot: Bot):
     await bot.edit_message_text(
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
-        text=callback_query.message.text + '\n Поздравляю, и удачи 🤞')
-    bot_db.add_user(callback_query.from_user.id, callback_query.from_user.username)
-
-
-@dp.callback_query(F.data.startswith('reject'))
-async def process_callback_kb1btn1(callback_query: types.CallbackQuery, bot: Bot):
-    await bot.answer_callback_query(callback_query.id)
+        text='Бла бла бла')
     await bot.edit_message_reply_markup(
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
-        reply_markup=None)
+        reply_markup=feedback_markup)
+
+
+@dp.callback_query(F.data == "manager")
+async def manager_menu(callback_query: types.CallbackQuery, bot: Bot):
     await bot.edit_message_text(
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
-        text=callback_query.message.text + '\n Зря вы отказались 😢')
+        text='Бла бла бла')
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=manager_markup)
+
+
+@dp.callback_query(F.data == "delivery_time")
+async def delivery_menu(callback_query: types.CallbackQuery, bot: Bot):
+    await bot.edit_message_text(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        text='🚚Приблизительные сроки доставки:\n\nТовар доезжает до склада в Китае за 2-6 дней, откуда направляется на '
+             'наш склад в Москву (это занимает примерно 12-16 дней), откуда отправляется Вам СДЭКом, '
+             'если это необходимо')
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=back_markup)
+
+
+@dp.callback_query(F.data == "currency")
+async def currency_menu(callback_query: types.CallbackQuery, bot: Bot):
+    cur = Currency()
+    await bot.edit_message_text(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        text=f'Текущий курс: {cur.current_converted_price} \n\n‼Курс юаня к рублю в нашем магазине зависит от курса '
+             f'Центрального Банка РФ. Предоставляем один из самы выгодных курсов на рынке🤩')
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=back_markup)
+
+
+@dp.callback_query(F.data == "back")
+async def back_menu(callback_query: types.CallbackQuery, bot: Bot, state: FSMContext):
+    await bot.edit_message_text(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        text='Привествую, я Hoops Shop Bot')
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=main_menu)
+    await state.clear()
+
+
+@dp.callback_query(F.data == "order")
+async def order_menu(callback_query: types.CallbackQuery, bot: Bot):
+    await bot.edit_message_text(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        text='Начните расчет')
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=product_markup)
+
+
+@dp.message(F.text == "Отменить расчет")
+async def product_handler(message: types.Message, state: FSMContext):
+    await message.answer("Расчет отменен", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Начните рассчет", reply_markup=product_markup)
+    await state.clear()
+
+
+@dp.callback_query(F.data.startswith("prod"))
+async def product_handler(callback_query: types.CallbackQuery, bot: Bot, state: FSMContext):
+    await state.update_data(category=prod_dict[callback_query.data])
+    await bot.answer_callback_query(callback_query.id)
+    await callback_query.message.answer("Введите цену товара в юанях", reply_markup=keyboard)
+    await state.set_state(OrderStates.price)
+
+
+@dp.message(OrderStates.price)
+async def price_state(message: types.Message, state: FSMContext):
+    try:
+        await state.update_data(price=int(message.text))
+        await message.answer("Отлично! Теперь введите адрес доставки")
+        await state.set_state(OrderStates.address)
+    except ValueError:
+        await message.answer("Вы ввели не число")
+
+
+@dp.message(OrderStates.address)
+async def address_state(message: types.Message, state: FSMContext):
+    await state.update_data(address=message.text)
+    data = await state.get_data()
+    cur = Currency()
+    price = int(((data['price'] * cur.current_converted_price) + 56 * data['category'][1]) * 1.2)
+    await message.answer(f"Доствавка до {data['address']} будет стоит {price} руб\n"
+                         f"Курс: {cur.current_converted_price}", reply_markup=order_markup)
+
+
+@dp.callback_query(F.data == "manager_order")
+async def manager_order_handler(callback_query: types.CallbackQuery, state: FSMContext, bot: Bot):
+    await bot.answer_callback_query(callback_query.id)
+    await callback_query.message.answer("Пришлите ссылку на ваш товар")
+    await state.set_state(OrderStates.link)
+
+
+@dp.message(OrderStates.link)
+async def link_state(message: types.Message, state: FSMContext):
+    await state.update_data(link=message.text)
+    await message.answer("Напишите размер вашего товара")
+    await state.set_state(OrderStates.size)
+
+
+@dp.message(OrderStates.size)
+async def link_state(message: types.Message, state: FSMContext):
+    await state.update_data(size=message.text)
+    await message.answer("Отлично! Теперь напишите свое ФИО")
+    await state.set_state(OrderStates.name)
+
+
+@dp.message(OrderStates.name)
+async def name_state(message: types.Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await message.answer("Отлично! Теперь напишите свое номер телефона, чтобы наш менеджер мог связаться с вами")
+    await state.set_state(OrderStates.phone)
+
+
+@dp.message(OrderStates.phone)
+async def phone_state(message: types.Message, state: FSMContext, bot: Bot):
+    await state.update_data(phone=message.text)
+    data = await state.get_data()
+    cur = Currency()
+    ru_price = int(((data['price'] * cur.current_converted_price) + 56 * data['category'][1]) * 1.2)
+    await message.answer("Спасибо за заказ, скоро наш менеджер с вами свяжется", reply_markup=back_markup)
+    await bot.send_message(keys.MANAGER_CHAT_ID, text=f"Заказ от {data['name']}\n"
+                                                      f"Категория: {data['category'][0]}\n"
+                                                      f"Размер товара: {data['size']}\n"
+                                                      f"Цена в юанях: {data['price']}\n"
+                                                      f"Цена в рублях: {ru_price}\n"
+                                                      f"Ссылка на товар: {data['link']}\n"
+                                                      f"Адресс доставки: {data['address']}\n"
+                                                      f"Номер телефона: {data['phone']}")
+    await state.clear()
 
 
 async def notifications(time, bot: Bot):
@@ -282,7 +499,6 @@ async def notifications(time, bot: Bot):
             delta = date - (datetime.now() + timedelta(hours=3))
             print(delta)
             if 0 <= delta.total_seconds() <= time:
-                print('yea ')
                 if event[4] != '-' and event[2] != 'n':
                     image = FSInputFile(f'photos/{event[4]}')
                     await bot.send_photo(keys.HOOPS_ID, photo=image,
