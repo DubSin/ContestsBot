@@ -16,10 +16,12 @@ from aiogram import Dispatcher, Bot, types
 from aiogram.filters.command import Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, \
+from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, \
     ReplyKeyboardRemove, KeyboardButton
+from aiogram.enums.parse_mode import ParseMode
 from aiogram.methods.get_chat_member import ChatMemberMember
-from utlits import get_chat_members, get_channel_members
+from aiogram.utils.media_group import MediaGroupBuilder
+from utlits import get_chat_members
 from currency import Currency
 
 bot_db = BoTDb('participants.db')
@@ -44,6 +46,9 @@ main_menu = InlineKeyboardMarkup(
 back_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
 
+admin_back_markup = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text="Вернуться в панель админа", callback_data="back_admin")]])
+
 feedback_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text='Оставить отзыв', url='https://t.me/hoops_reaction')],
                      [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
@@ -51,10 +56,9 @@ feedback_markup = InlineKeyboardMarkup(
 manager_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text='Написать менеджеру', url='https://t.me/raketka_228')],
                      [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
-channel_markup = InlineKeyboardMarkup(
-    inline_keyboard=[[InlineKeyboardButton(text='Принять участие', url='https://t.me/Hoops_shop_bot')]])
-
 keyboard = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить расчет")]], resize_keyboard=True)
+break_contest_keyboard = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить конкурс")]], resize_keyboard=True)
+break_newslet_keyboard = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить рассылку")]], resize_keyboard=True)
 
 product_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text="Кроссовки👟", callback_data="prod_sneakers"),
@@ -78,6 +82,10 @@ order_markup = InlineKeyboardMarkup(
                      [InlineKeyboardButton(text="Заказать", callback_data="manager_order")],
                      [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
 
+order_back_markup = InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text="Заказать еще", callback_data="order")],
+                     [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
+
 prod_dict = {"prod_sneakers": ['Кросовки', 0.5], "prod_winter_shoes": ['Зимняя обувь', 0.5],
              "prod_pants": ['Штаны', 0.5], "prod_shorts": ['Шорты', 0.5],
              "prod_shirts": ['Футболки и Рубашки', 0.5], "prod_balls": ['Мячи', 0.5],
@@ -90,14 +98,14 @@ prod_dict = {"prod_sneakers": ['Кросовки', 0.5], "prod_winter_shoes": ['
 class ContestState(StatesGroup):
     time = State()
     text = State()
-    image = State()
+    media = State()
     fake = State()
     after_text = State()
 
 
 class SendMembers(StatesGroup):
     text = State()
-    photo = State()
+    media = State()
     contest = State()
 
 
@@ -127,17 +135,55 @@ async def start_menu(message: types.Message, bot: Bot):
         await message.answer('Приветствую в панели админа ', reply_markup=admin_markup)
 
 
+@dp.message(F.text == "Отменить конкурс")
+async def product_handler(message: types.Message, state: FSMContext):
+    await message.answer("Конкурс отменен", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Приветствую в панели админа", reply_markup=admin_markup)
+    await state.clear()
+
+
+@dp.message(F.text == "Отменить рассылку")
+async def product_handler(message: types.Message, state: FSMContext):
+    await message.answer("Рассылка отменена", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Приветствую в панели админа", reply_markup=admin_markup)
+    await state.clear()
+
+
+@dp.callback_query(F.data == "back_admin")
+async def back_menu(callback_query: types.CallbackQuery, bot: Bot, state: FSMContext):
+    await bot.edit_message_text(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        text='Приветствую в панели админа')
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=admin_markup)
+    await state.clear()
+
+
 @dp.callback_query(F.data == 'details')
 async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
     await bot.answer_callback_query(callback_query.id)
     event_det = bot_db.get_event_details()
     if event_det:
-        await callback_query.message.answer(f'Дата: {event_det[1]} \n'
-                                            f'Текст поста: {event_det[3]} \n'
-                                            f"Фейк: {event_det[2] if 'n' else 'yes'} \n"
-                                            f"Ссылка на фото: {event_det[-1]}")
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text=f'Дата: {event_det[1]} \n'
+                 f'Текст поста: {event_det[3]} \n'
+                 f"Фейк: {event_det[2] if 'n' else 'yes'} \n"
+                 f"Ссылка на фото: {event_det[4]}\n"
+                 f"Текст победителя: {event_det[-1]}")
     else:
-        await callback_query.message.answer('Нет текущего ивента')
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text='Нет текущего ивента')
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=admin_back_markup)
 
 
 @dp.callback_query(F.data == 'members')
@@ -148,9 +194,19 @@ async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
     if event_memb:
         for i in event_memb:
             st += f'Ник: {i[1]}, ID: {i[0]} \n'
-        await callback_query.message.answer(st)
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text=st)
     else:
-        await callback_query.message.answer('Нет текущего ивента')
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text="Нет участников")
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=admin_back_markup)
 
 
 @dp.callback_query(F.data == 'event')
@@ -173,9 +229,20 @@ async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
     events = bot_db.event_exists()
     if events:
         bot_db.del_event()
-        await callback_query.message.answer("Готово")
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text="Готово")
+        await del_media('media')
     else:
-        await callback_query.message.answer("Нет текущих ивентов")
+        await bot.edit_message_text(
+            chat_id=callback_query.from_user.id,
+            message_id=callback_query.message.message_id,
+            text="Нет текущих ивентов")
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=admin_back_markup)
 
 
 @dp.callback_query(simple_cal_callback.filter())
@@ -186,7 +253,8 @@ async def process_simple_calendar(callback_query: types.CallbackQuery, callback_
         await callback_query.message.edit_text(
             callback_query.message.text + f'\n Вы выбрали {date.strftime("%d/%m/%Y")}')
         await state.update_data(date=date.strftime("%d/%m/%Y"))
-        await callback_query.message.answer("Теперь введите время конурса в формате (Час:минута):")
+        await callback_query.message.answer("Теперь введите время конурса в формате (Час:минута):",
+                                            reply_markup=break_contest_keyboard)
         await state.set_state(ContestState.time)
 
 
@@ -204,28 +272,30 @@ async def password(message: types.Message, state: FSMContext):
 @dp.message(ContestState.text)
 async def text(message: types.Message, state: FSMContext):
     await state.update_data(text=message.text)
-    await message.answer("Прикрепите фото разыгрываемого лота или пришлите '-' если фото отсутствует")
-    await state.set_state(ContestState.image)
+    await message.answer("Прикрепите фото/видео разыгрываемого лота, пришлите '-' после всех высланых файлов")
+    await state.set_state(ContestState.media)
 
 
-@dp.message(ContestState.image)
+@dp.message(ContestState.media)
 async def photo(message: types.Message, state: FSMContext, bot: Bot):
     if message.photo:
-        file_name = f"photos/{message.photo[-1].file_id}.jpg"
+        file_name = f"media/{message.photo[-1].file_id}.jpg"
         await bot.download(message.photo[-1], destination=file_name)
-        await state.update_data(image=f'{message.photo[-1].file_id}.jpg')
+    if message.video:
+        print(message.video)
+        file_name = f"media/{message.video.file_id}.mp4"
+        await bot.download(message.video, destination=file_name)
+    if message.text == '-':
+        media = ' '.join([f for f in os.listdir('media') if os.path.isfile(os.path.join('media', f))])
+        print(media)
+        await state.update_data(media=media)
         await message.answer('Это фейковый розыгрыш? Если да то напишите имя пользователя, если нет то напишите "n"')
         await state.set_state(ContestState.fake)
-    elif message.text == '-':
-        await state.update_data(image='-')
-        await message.answer('Это фейковый розыгрыш? Если да то напишите имя пользователя, если нет то напишите "n"')
-        await state.set_state(ContestState.fake)
-    else:
-        await message.answer('Это не фото')
+
 
 
 @dp.message(ContestState.fake)
-async def fake(message: types.Message, state: FSMContext, bot: Bot):
+async def fake(message: types.Message, state: FSMContext):
     await state.update_data(fake=message.text)
     await message.answer("Отлично! Теперь введите сообщение победителю")
     await state.set_state(ContestState.after_text)
@@ -235,61 +305,98 @@ async def fake(message: types.Message, state: FSMContext, bot: Bot):
 async def fake(message: types.Message, state: FSMContext, bot: Bot):
     await state.update_data(after_text=message.text)
     dat = await state.get_data()
-    bot_db.add_event(dat['date'], dat['time'], dat['text'], dat['image'], dat['fake'], dat['after_text'])
-    await message.answer('Все готово')
-    if dat['image'] != '-':
-        image = FSInputFile(f'photos/{dat["image"]}')
-        await bot.send_photo(keys.HOOPS_ID, photo=image, caption=f'Внимание!!! {dat["text"]} \n'
-                                                                 f'Дата и время: {dat["date"]} в {dat["time"]}',
-                             reply_markup=channel_markup)
-    else:
-        await bot.send_message(keys.HOOPS_ID, f'Внимание!!! {dat["text"]} \n'
-                                              f'Дата и время: {dat["date"]} в {dat["time"]}',
-                               reply_markup=channel_markup)
+    bot_db.add_event(dat['date'], dat['time'], dat['text'], dat['media'], dat['fake'], dat['after_text'])
+    await message.answer('Конкурс создан', reply_markup=ReplyKeyboardRemove())
+    await message.answer('Вернутся в панель админа', reply_markup=admin_back_markup)
+    str_media = dat['media'].split()
+    print(str_media)
+    sck = 0
+    media_group = MediaGroupBuilder()
+    for obj in str_media:
+        if obj.endswith('.mp4') or obj.endswith('.MP4'):
+            if sck == 0:
+                media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"),
+                                    caption=f'Внимание!!! {dat["text"]} \n'
+                                    f'Дата и время: {dat["date"]} в {dat["time"]}\n'
+                                    f"Хочешь участвовать <a href='https://t.me/Hoops_shop_bot'>жми</a>",
+                                    parse_mode=ParseMode.HTML)
+            else:
+                media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"))
+        if obj.endswith('.jpg'):
+            if sck == 0:
+                media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"),
+                                    caption=f'Внимание!!! {dat["text"]} \n'
+                                    f'Дата и время: {dat["date"]} в {dat["time"]}\n'
+                                    f"Хочешь участвовать <a href='https://t.me/Hoops_shop_bot'>жми</a>",
+                                    parse_mode=ParseMode.HTML)
+            else:
+                media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"))
+        sck +=1
+    await bot.send_media_group(keys.HOOPS_ID, media=media_group.build())
+
     await state.clear()
 
 
 @dp.callback_query(F.data == 'send_to_all')
 async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot, state: FSMContext):
     await bot.answer_callback_query(callback_query.id)
-    await callback_query.message.answer("Введите какой текст хотите отправить всем участникам группы Hoops")
+    await callback_query.message.answer("Введите какой текст хотите отправить всем участникам группы Hoops",
+                                        reply_markup=break_newslet_keyboard)
     await state.set_state(SendMembers.text)
 
 
 @dp.message(SendMembers.text)
 async def send_text(message: types.Message, state: FSMContext):
     await state.update_data(text=message.text)
-    await message.answer("Добавьте фотографии (напишите '-', если не хотите добавлять)")
-    await state.set_state(SendMembers.photo)
+    await message.answer("Добавьте фотографии/видео (напишите '-', в качестве завершения)")
+    await state.set_state(SendMembers.media)
 
 
-@dp.message(SendMembers.photo)
+@dp.message(SendMembers.media)
 async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
-    feedback_members = await get_chat_members(keys.HOOPS_CHAT_ID)
-    channel_members = await get_channel_members(keys.HOOPS_ID)
-    members = set(feedback_members + channel_members)
     try:
-        for i in members:
-            print(i)
         if message.photo:
-            file_name = f"photos/{message.photo[-1].file_id}.jpg"
+            file_name = f"media_distrib/{message.photo[-1].file_id}.jpg"
             await bot.download(message.photo[-1], destination=file_name)
-            await state.update_data(photo=f'{message.photo[-1].file_id}.jpg')
+        if message.video:
+            file_name = f"media_distrib/{message.video.file_id}.mp4"
+            await bot.download(message.video, destination=file_name)
+        if message.text == '-':
+            media = ' '.join([f for f in os.listdir('media_distrib') if os.path.isfile(os.path.join('media_distrib', f))])
+            await state.update_data(media=media)
             dat = await state.get_data()
-            image = FSInputFile(f'photos/{dat["photo"]}')
-            for member in members:
-                await bot.send_photo(member, photo=image, caption=dat['text'])
-        elif message.text == '-':
-            await state.update_data(photo='-')
-            dat = await state.get_data()
-            for member in members:
-                await bot.send_message(member, dat['text'])
-        else:
-            await message.answer('Это не фото')
-        await message.answer('Сообщение успешное отправлено')
+            members = await get_chat_members(keys.HOOPS_CHAT_ID)
+            if media:
+                str_media = dat['media'].split()
+                sck = 0
+                media_group = MediaGroupBuilder()
+                for obj in str_media:
+                    if obj.endswith('.mp4') or obj.endswith('.MP4'):
+                        if sck == 0:
+                            media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"),
+                                                  caption=dat['text'])
+                        else:
+                            media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"))
+                    if obj.endswith('.jpg'):
+                        if sck == 0:
+                            media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"),
+                                                  caption=dat['text'])
+                        else:
+                            media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"))
+                    sck += 1
+                for member in members:
+                    await bot.send_media_group(member, media=media_group.build())
+            else:
+                for member in members:
+                    await bot.send_message(member, dat['text'])
+            await message.answer('Рассылка завершена', reply_markup=ReplyKeyboardRemove())
+            await message.answer('Сообщения успешно отправлены', reply_markup=admin_back_markup)
+            await del_media('media_distrib')
+            await state.clear()
     except exceptions.TelegramForbiddenError:
-        pass
-    await state.clear()
+        await message.answer('Апи перегружен, попробуйте позже', reply_markup=ReplyKeyboardRemove())
+        await message.answer('Вернуться в меню', reply_markup=admin_back_markup)
+        await del_media('media_distrib')
 
 
 @dp.message(Command(commands=["start"]))
@@ -337,7 +444,7 @@ async def feedback_menu(callback_query: types.CallbackQuery, bot: Bot):
     await bot.edit_message_text(
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
-        text='Бла бла бла')
+        text='Оставьте отзыв')
     await bot.edit_message_reply_markup(
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
@@ -349,7 +456,7 @@ async def manager_menu(callback_query: types.CallbackQuery, bot: Bot):
     await bot.edit_message_text(
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
-        text='Бла бла бла')
+        text='Напишите менеджеру')
     await bot.edit_message_reply_markup(
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
@@ -398,7 +505,7 @@ async def back_menu(callback_query: types.CallbackQuery, bot: Bot, state: FSMCon
 
 
 @dp.callback_query(F.data == "order")
-async def order_menu(callback_query: types.CallbackQuery, bot: Bot):
+async def order_menu(callback_query: types.CallbackQuery, bot: Bot, state: FSMContext):
     await bot.edit_message_text(
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
@@ -407,6 +514,7 @@ async def order_menu(callback_query: types.CallbackQuery, bot: Bot):
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
         reply_markup=product_markup)
+    await state.clear()
 
 
 @dp.message(F.text == "Отменить расчет")
@@ -438,10 +546,13 @@ async def price_state(message: types.Message, state: FSMContext):
 async def address_state(message: types.Message, state: FSMContext):
     await state.update_data(address=message.text)
     data = await state.get_data()
-    cur = Currency()
-    price = int(((data['price'] * cur.current_converted_price) + 56 * data['category'][1]) * 1.2)
-    await message.answer(f"Доствавка до {data['address']} будет стоит {price} руб\n"
-                         f"Курс: {cur.current_converted_price}", reply_markup=order_markup)
+    try:
+        cur = Currency()
+        price = int(((data['price'] * cur.current_converted_price) + 56 * data['category'][1]) * 1.2)
+        await message.answer(f"Доствавка до {data['address']} будет стоит {price} руб\n"
+                             f"Курс: {cur.current_converted_price}", reply_markup=order_markup)
+    except Exception:
+        await message.answer("Возникла ошибка", reply_markup=back_markup)
 
 
 @dp.callback_query(F.data == "manager_order")
@@ -476,17 +587,24 @@ async def name_state(message: types.Message, state: FSMContext):
 async def phone_state(message: types.Message, state: FSMContext, bot: Bot):
     await state.update_data(phone=message.text)
     data = await state.get_data()
-    cur = Currency()
-    ru_price = int(((data['price'] * cur.current_converted_price) + 56 * data['category'][1]) * 1.2)
-    await message.answer("Спасибо за заказ, скоро наш менеджер с вами свяжется", reply_markup=back_markup)
-    await bot.send_message(keys.MANAGER_CHAT_ID, text=f"Заказ от {data['name']}\n"
-                                                      f"Категория: {data['category'][0]}\n"
-                                                      f"Размер товара: {data['size']}\n"
-                                                      f"Цена в юанях: {data['price']}\n"
-                                                      f"Цена в рублях: {ru_price}\n"
-                                                      f"Ссылка на товар: {data['link']}\n"
-                                                      f"Адресс доставки: {data['address']}\n"
-                                                      f"Номер телефона: {data['phone']}")
+    try:
+        cur = Currency()
+        ru_price = int(((data['price'] * cur.current_converted_price) + 56 * data['category'][1]) * 1.2)
+        username = message.from_user.username
+        await message.answer("Спасибо за заказ", reply_markup=ReplyKeyboardRemove())
+        await message.answer('Cкоро наш менеджер с вами свяжется', reply_markup=order_back_markup)
+        await bot.send_message(keys.MANAGER_CHAT_ID, text=f"Заказ от {data['name']}\n"
+                                                          f"Категория: {data['category'][0]}\n"
+                                                          f"Размер товара: {data['size']}\n"
+                                                          f"Цена в юанях: {data['price']}\n"
+                                                          f"Цена в рублях: {ru_price}\n"
+                                                          f"Ссылка на товар: {data['link']}\n"
+                                                          f"Адресс доставки: {data['address']}\n"
+                                                          f"Номер телефона: {data['phone']}\n"
+                                                          f"Связаться с клиентом: <a href='https://t.me/{username}'>жми</a>",
+                               parse_mode=ParseMode.HTML)
+    except Exception:
+        await message.answer("Возникла ошибка", reply_markup=back_markup)
     await state.clear()
 
 
@@ -497,35 +615,57 @@ async def notifications(time, bot: Bot):
         if event and members:
             date = datetime.strptime(event[1], '%d/%m/%Y %H:%M')
             delta = date - (datetime.now() + timedelta(hours=3))
-            print(delta)
+            print("Seconds to event:" + str(delta.total_seconds()))
             if 0 <= delta.total_seconds() <= time:
-                if event[4] != '-' and event[2] != 'n':
-                    image = FSInputFile(f'photos/{event[4]}')
-                    await bot.send_photo(keys.HOOPS_ID, photo=image,
-                                         caption=f'Победил: @{event[2]}\n' + event[-1])
-                    await bot.send_photo(keys.ADMIN_ID, photo=image,
-                                         caption=f'Победил: @{event[2]}\n' + event[-1])
-                    await del_photos(f'photos/{event[4]}')
-                elif event[4] != '-' and event[2] == 'n':
+                if event[2] != 'n':
+                    str_media = event[4].split()
+                    sck = 0
+                    media_group = MediaGroupBuilder()
+                    for obj in str_media:
+                        if obj.endswith('.mp4') or obj.endswith('.MP4'):
+                            if sck == 0:
+                                media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"),
+                                                      caption=f'Победил: @{event[2]}\n' + event[-1])
+                            else:
+                                media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"))
+                        if obj.endswith('.jpg'):
+                            if sck == 0:
+                                media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"),
+                                                      caption=f'Победил: @{event[2]}\n' + event[-1])
+                            else:
+                                media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"))
+                        sck += 1
+                    await bot.send_media_group(keys.HOOPS_ID, media=media_group.build())
+                    await bot.send_media_group(keys.ADMIN_ID, media=media_group.build())
+
+                    await del_media(f'media')
+                elif event[2] == 'n':
                     winner = random.choice(members)
-                    image = FSInputFile(f'photos/{event[4]}')
-                    await bot.send_photo(keys.HOOPS_ID, photo=image,
-                                         caption=f'Победил: @{winner[1]}\n' + event[-1])
-                    await bot.send_photo(keys.ADMIN_ID, photo=image,
-                                         caption=f'Победил: @{winner[1]}\n' + event[-1])
-                    await del_photos(f'photos/{event[4]}')
-                elif event[2] != 'n' and event[4] == '-':
-                    await bot.send_message(keys.HOOPS_ID, f'Победил: @{event[2]}\n' + event[-1])
-                    await bot.send_message(keys.ADMIN_ID, f'Победил: @{event[2]}\n' + event[-1])
-                elif event[2] == 'n' and event[4] == '-':
-                    winner = random.choice(members)
-                    await bot.send_message(keys.HOOPS_ID, f'Победил: @{winner[1]}\n' + event[-1])
-                    await bot.send_message(keys.ADMIN_ID, f'Победил: @{winner[1]}\n' + event[-1])
+                    str_media = event[4].split()
+                    sck = 0
+                    media_group = MediaGroupBuilder()
+                    for obj in str_media:
+                        if obj.endswith('.mp4') or obj.endswith('.MP4'):
+                            if sck == 0:
+                                media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"),
+                                                      caption=f'Победил: @{winner[1]}\n' + event[-1])
+                            else:
+                                media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"))
+                        if obj.endswith('.jpg'):
+                            if sck == 0:
+                                media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"),
+                                                      caption=f'Победил: @{winner[1]}\n' + event[-1])
+                            else:
+                                media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"))
+                        sck += 1
+                    await bot.send_media_group(keys.HOOPS_ID, media=media_group.build())
+                    await bot.send_media_group(keys.ADMIN_ID, media=media_group.build())
+                    await del_media('media')
                 bot_db.del_event()
         await asyncio.sleep(time)
 
 
-async def del_photos(folder_path):
+async def del_media(folder_path):
     shutil.rmtree(folder_path)
     os.mkdir(folder_path)
 
