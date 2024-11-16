@@ -32,8 +32,8 @@ admin_markup = InlineKeyboardMarkup(
                      [InlineKeyboardButton(text='Удалить текущий розыгрыш', callback_data='del_event')],
                      [InlineKeyboardButton(text='Текущий розыгрыш', callback_data='details')],
                      [InlineKeyboardButton(text='Текущие участники', callback_data='members')],
-                     [InlineKeyboardButton(text='Написать всем подписчикам', callback_data='send_to_all')]
-                     ])
+                     [InlineKeyboardButton(text='Написать всем подписчикам', callback_data='send_to_all')],
+                     [InlineKeyboardButton(text='Написать в канал приветствие', callback_data='send_to_channel')]])
 
 main_menu = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text="Оформить/Рассчитать заказ", callback_data='order')],
@@ -46,6 +46,9 @@ main_menu = InlineKeyboardMarkup(
 back_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
 
+channel_markup = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Заказать',
+                                                                             url='https://t.me/Hoops_shop_bot')]])
+
 admin_back_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text="Вернуться в панель админа", callback_data="back_admin")]])
 
@@ -57,8 +60,10 @@ manager_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text='Написать менеджеру', url='https://t.me/raketka_228')],
                      [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
 keyboard = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить расчет")]], resize_keyboard=True)
-break_contest_keyboard = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить конкурс")]], resize_keyboard=True)
-break_newslet_keyboard = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить рассылку")]], resize_keyboard=True)
+break_contest_keyboard = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить конкурс")]],
+                                                   resize_keyboard=True)
+break_newslet_keyboard = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Отменить рассылку")]],
+                                                   resize_keyboard=True)
 
 product_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text="Кроссовки👟", callback_data="prod_sneakers"),
@@ -90,7 +95,7 @@ prod_dict = {"prod_sneakers": ['Кросовки', 0.6], "prod_winter_shoes": ['
              "prod_pants": ['Штаны', 0.7], "prod_shorts": ['Шорты', 0.35],
              "prod_shirts": ['Футболки и Рубашки', 0.5], "prod_balls": ['Мячи', 0.6],
              "prod_decors": ['Украшения', 0.3], "prod_perfumes": ['Парфюмы', 0.3],
-             "prod_sweatshirts": ['Кофты и свитера🩳', 0.7], "prod_jacket": ['Верхняя одежда', 1],
+             "prod_sweatshirts": ['Кофты и свитера', 0.7], "prod_jacket": ['Верхняя одежда', 1],
              "prod_underwear": ['Нижнее белье', 0.2], "prod_accessories": ['Аксессуары', 0.3],
              "prod_small_bag": ['Маленькая сумка', 0.5], "prod_big_bag": ['Большая сумка/Рюкзак', 0.7]}
 
@@ -293,7 +298,6 @@ async def photo(message: types.Message, state: FSMContext, bot: Bot):
         await state.set_state(ContestState.fake)
 
 
-
 @dp.message(ContestState.fake)
 async def fake(message: types.Message, state: FSMContext):
     await state.update_data(fake=message.text)
@@ -316,22 +320,22 @@ async def fake(message: types.Message, state: FSMContext, bot: Bot):
         if obj.endswith('.mp4') or obj.endswith('.MP4'):
             if sck == 0:
                 media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"),
-                                    caption=f'Внимание!!! {dat["text"]} \n'
-                                    f'Дата и время: {dat["date"]} в {dat["time"]}\n'
-                                    f"Хочешь участвовать <a href='https://t.me/Hoops_shop_bot'>жми</a>",
-                                    parse_mode=ParseMode.HTML)
+                                      caption=f'Внимание!!! {dat["text"]} \n'
+                                              f'Дата и время: {dat["date"]} в {dat["time"]}\n'
+                                              f"Хочешь участвовать <a href='https://t.me/Hoops_shop_bot'>жми</a>",
+                                      parse_mode=ParseMode.HTML)
             else:
                 media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"))
         if obj.endswith('.jpg'):
             if sck == 0:
                 media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"),
-                                    caption=f'Внимание!!! {dat["text"]} \n'
-                                    f'Дата и время: {dat["date"]} в {dat["time"]}\n'
-                                    f"Хочешь участвовать <a href='https://t.me/Hoops_shop_bot'>жми</a>",
-                                    parse_mode=ParseMode.HTML)
+                                      caption=f'Внимание!!! {dat["text"]} \n'
+                                              f'Дата и время: {dat["date"]} в {dat["time"]}\n'
+                                              f"Хочешь участвовать <a href='https://t.me/Hoops_shop_bot'>жми</a>",
+                                      parse_mode=ParseMode.HTML)
             else:
                 media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"))
-        sck +=1
+        sck += 1
     await bot.send_media_group(keys.HOOPS_ID, media=media_group.build())
 
     await state.clear()
@@ -345,6 +349,28 @@ async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot, s
     await state.set_state(SendMembers.text)
 
 
+@dp.callback_query(F.data == 'send_to_channel')
+async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
+    await bot.answer_callback_query(callback_query.id)
+    msg_text = """🔥Приветствуем друг , мы команда молодых предпринимателей, занимающихся выкупом и доставкой товаров из Китая\n
+    ✨  Мы доставляем товары с  китайского маркетплейса  Poizon \n
+    🐦‍🔥 𝐻𝑂𝑂𝑃𝑆_𝑆𝐻𝑂𝑃 - это место, где стиль встречается с качеством, а шопинг становится настоящим удовольствием.
+     \nНаш бот:\n @Hoops_shop_bot
+     \nПоддержка:\n @raketka_228 """
+    to_pin_message = await bot.send_photo(keys.HOOPS_ID, FSInputFile('service_media/logo.jpg'),
+                                          caption=msg_text,
+                                          reply_markup=channel_markup)
+    await bot.pin_chat_message(chat_id=keys.HOOPS_ID, message_id=to_pin_message.message_id)
+    await bot.edit_message_text(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        text="Сообщение успешно отпралено")
+    await bot.edit_message_reply_markup(
+        chat_id=callback_query.from_user.id,
+        message_id=callback_query.message.message_id,
+        reply_markup=admin_back_markup)
+
+
 @dp.message(SendMembers.text)
 async def send_text(message: types.Message, state: FSMContext):
     await state.update_data(text=message.text)
@@ -356,13 +382,14 @@ async def send_text(message: types.Message, state: FSMContext):
 async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
     try:
         if message.photo:
-            file_name = f"media_distrib/{message.photo[-1].file_id}.jpg"
-            await bot.download(message.photo[-1], destination=file_name)
+            path = f"media_distrib/{message.photo[-1].file_id}.jpg"
+            await bot.download(message.photo[-1], destination=path)
         if message.video:
-            file_name = f"media_distrib/{message.video.file_id}.mp4"
-            await bot.download(message.video, destination=file_name)
+            path = f"media_distrib/{message.video.file_id}.mp4"
+            await bot.download(message.video, destination=path)
         if message.text == '-':
-            media = ' '.join([f for f in os.listdir('media_distrib') if os.path.isfile(os.path.join('media_distrib', f))])
+            media = ' '.join(
+                [f for f in os.listdir('media_distrib') if os.path.isfile(os.path.join('media_distrib', f))])
             await state.update_data(media=media)
             dat = await state.get_data()
             members = await get_chat_members(keys.HOOPS_CHAT_ID)
@@ -373,16 +400,16 @@ async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
                 for obj in str_media:
                     if obj.endswith('.mp4') or obj.endswith('.MP4'):
                         if sck == 0:
-                            media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"),
+                            media_group.add_video(type="video", media=FSInputFile(f"media_distrib/{obj}"),
                                                   caption=dat['text'])
                         else:
-                            media_group.add_video(type="video", media=FSInputFile(f"media/{obj}"))
+                            media_group.add_video(type="video", media=FSInputFile(f"media_distrib/{obj}"))
                     if obj.endswith('.jpg'):
                         if sck == 0:
-                            media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"),
+                            media_group.add_photo(type="photo", media=FSInputFile(f"media_distrib/{obj}"),
                                                   caption=dat['text'])
                         else:
-                            media_group.add_photo(type="photo", media=FSInputFile(f"media/{obj}"))
+                            media_group.add_photo(type="photo", media=FSInputFile(f"media_distrib/{obj}"))
                     sck += 1
                 for member in members:
                     await bot.send_media_group(member, media=media_group.build())
@@ -558,7 +585,10 @@ async def address_state(message: types.Message, state: FSMContext):
 @dp.callback_query(F.data == "manager_order")
 async def manager_order_handler(callback_query: types.CallbackQuery, state: FSMContext, bot: Bot):
     await bot.answer_callback_query(callback_query.id)
-    await callback_query.message.answer("Пришлите ссылку на ваш товар")
+    media_group = MediaGroupBuilder(caption="Пришлите ссылку на ваш товар(Инскрукция на фото выше)")
+    media_group.add_photo(type="photo", media=FSInputFile(f"service_media/instruct2.jpg"))
+    media_group.add_photo(type="photo", media=FSInputFile(f"service_media/instruct1.jpg"))
+    await bot.send_media_group(callback_query.from_user.id, media=media_group.build())
     await state.set_state(OrderStates.link)
 
 
