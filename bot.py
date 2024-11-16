@@ -393,37 +393,41 @@ async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
             await state.update_data(media=media)
             dat = await state.get_data()
             members = await get_chat_members(keys.HOOPS_CHAT_ID)
-            if media:
-                str_media = dat['media'].split()
-                sck = 0
-                media_group = MediaGroupBuilder()
-                for obj in str_media:
-                    if obj.endswith('.mp4') or obj.endswith('.MP4'):
-                        if sck == 0:
-                            media_group.add_video(type="video", media=FSInputFile(f"media_distrib/{obj}"),
-                                                  caption=dat['text'])
-                        else:
-                            media_group.add_video(type="video", media=FSInputFile(f"media_distrib/{obj}"))
-                    if obj.endswith('.jpg'):
-                        if sck == 0:
-                            media_group.add_photo(type="photo", media=FSInputFile(f"media_distrib/{obj}"),
-                                                  caption=dat['text'])
-                        else:
-                            media_group.add_photo(type="photo", media=FSInputFile(f"media_distrib/{obj}"))
-                    sck += 1
-                for member in members:
-                    await bot.send_media_group(member, media=media_group.build())
+            if type(media) == list:
+                if media:
+                    str_media = dat['media'].split()
+                    sck = 0
+                    media_group = MediaGroupBuilder()
+                    for obj in str_media:
+                        if obj.endswith('.mp4') or obj.endswith('.MP4'):
+                            if sck == 0:
+                                media_group.add_video(type="video", media=FSInputFile(f"media_distrib/{obj}"),
+                                                      caption=dat['text'])
+                            else:
+                                media_group.add_video(type="video", media=FSInputFile(f"media_distrib/{obj}"))
+                        if obj.endswith('.jpg'):
+                            if sck == 0:
+                                media_group.add_photo(type="photo", media=FSInputFile(f"media_distrib/{obj}"),
+                                                      caption=dat['text'])
+                            else:
+                                media_group.add_photo(type="photo", media=FSInputFile(f"media_distrib/{obj}"))
+                        sck += 1
+                    for member in members:
+                        await bot.send_media_group(member, media=media_group.build())
+                else:
+                    for member in members:
+                        await bot.send_message(member, dat['text'])
+                await message.answer('Рассылка завершена', reply_markup=ReplyKeyboardRemove())
+                await message.answer('Сообщения успешно отправлены', reply_markup=admin_back_markup)
+                await del_media('media_distrib')
+                await state.clear()
             else:
-                for member in members:
-                    await bot.send_message(member, dat['text'])
-            await message.answer('Рассылка завершена', reply_markup=ReplyKeyboardRemove())
-            await message.answer('Сообщения успешно отправлены', reply_markup=admin_back_markup)
-            await del_media('media_distrib')
-            await state.clear()
+                await message.answer(f'Апи перегружен на {media} секунд, попробуйте позже',
+                                     reply_markup=ReplyKeyboardRemove())
+                await message.answer('Вернуться в меню', reply_markup=admin_back_markup)
+                await del_media('media_distrib')
     except exceptions.TelegramForbiddenError:
-        await message.answer('Апи перегружен, попробуйте позже', reply_markup=ReplyKeyboardRemove())
-        await message.answer('Вернуться в меню', reply_markup=admin_back_markup)
-        await del_media('media_distrib')
+        pass
 
 
 @dp.message(Command(commands=["start"]))
