@@ -393,7 +393,7 @@ async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
             await state.update_data(media=media)
             dat = await state.get_data()
             members = await get_chat_members(keys.HOOPS_CHAT_ID)
-            if type(media) == list:
+            if type(members) == list:
                 if media:
                     str_media = dat['media'].split()
                     sck = 0
@@ -422,7 +422,7 @@ async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
                 await del_media('media_distrib')
                 await state.clear()
             else:
-                await message.answer(f'Апи перегружен на {media} секунд, попробуйте позже',
+                await message.answer(f'Апи перегружен на {members} секунд, попробуйте позже',
                                      reply_markup=ReplyKeyboardRemove())
                 await message.answer('Вернуться в меню', reply_markup=admin_back_markup)
                 await del_media('media_distrib')
