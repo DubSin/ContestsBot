@@ -21,18 +21,18 @@ from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarku
 from aiogram.enums.parse_mode import ParseMode
 from aiogram.methods.get_chat_member import ChatMemberMember
 from aiogram.utils.media_group import MediaGroupBuilder
-from utlits import get_chat_members
+
 from currency import Currency
 
 bot_db = BoTDb('participants.db')
 dp = Dispatcher(storage=MemoryStorage())
+
 
 admin_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text='Создать новый розыгрыш', callback_data='event')],
                      [InlineKeyboardButton(text='Удалить текущий розыгрыш', callback_data='del_event')],
                      [InlineKeyboardButton(text='Текущий розыгрыш', callback_data='details')],
                      [InlineKeyboardButton(text='Текущие участники', callback_data='members')],
-                     [InlineKeyboardButton(text='Написать всем подписчикам', callback_data='send_to_all')],
                      [InlineKeyboardButton(text='Написать в канал приветствие', callback_data='send_to_channel')]])
 
 main_menu = InlineKeyboardMarkup(
@@ -106,12 +106,6 @@ class ContestState(StatesGroup):
     media = State()
     fake = State()
     after_text = State()
-
-
-class SendMembers(StatesGroup):
-    text = State()
-    media = State()
-    contest = State()
 
 
 class OrderStates(StatesGroup):
@@ -341,14 +335,6 @@ async def fake(message: types.Message, state: FSMContext, bot: Bot):
     await state.clear()
 
 
-@dp.callback_query(F.data == 'send_to_all')
-async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot, state: FSMContext):
-    await bot.answer_callback_query(callback_query.id)
-    await callback_query.message.answer("Введите какой текст хотите отправить всем участникам группы Hoops",
-                                        reply_markup=break_newslet_keyboard)
-    await state.set_state(SendMembers.text)
-
-
 @dp.callback_query(F.data == 'send_to_channel')
 async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
     await bot.answer_callback_query(callback_query.id)
@@ -369,65 +355,6 @@ async def process_callback_user(callback_query: types.CallbackQuery, bot: Bot):
         chat_id=callback_query.from_user.id,
         message_id=callback_query.message.message_id,
         reply_markup=admin_back_markup)
-
-
-@dp.message(SendMembers.text)
-async def send_text(message: types.Message, state: FSMContext):
-    await state.update_data(text=message.text)
-    await message.answer("Добавьте фотографии/видео (напишите '-', в качестве завершения)")
-    await state.set_state(SendMembers.media)
-
-
-@dp.message(SendMembers.media)
-async def send_photo(message: types.Message, state: FSMContext, bot: Bot):
-    try:
-        if message.photo:
-            path = f"media_distrib/{message.photo[-1].file_id}.jpg"
-            await bot.download(message.photo[-1], destination=path)
-        if message.video:
-            path = f"media_distrib/{message.video.file_id}.mp4"
-            await bot.download(message.video, destination=path)
-        if message.text == '-':
-            media = ' '.join(
-                [f for f in os.listdir('media_distrib') if os.path.isfile(os.path.join('media_distrib', f))])
-            await state.update_data(media=media)
-            dat = await state.get_data()
-            members = await get_chat_members(keys.HOOPS_CHAT_ID)
-            if type(members) == list:
-                if media:
-                    str_media = dat['media'].split()
-                    sck = 0
-                    media_group = MediaGroupBuilder()
-                    for obj in str_media:
-                        if obj.endswith('.mp4') or obj.endswith('.MP4'):
-                            if sck == 0:
-                                media_group.add_video(type="video", media=FSInputFile(f"media_distrib/{obj}"),
-                                                      caption=dat['text'])
-                            else:
-                                media_group.add_video(type="video", media=FSInputFile(f"media_distrib/{obj}"))
-                        if obj.endswith('.jpg'):
-                            if sck == 0:
-                                media_group.add_photo(type="photo", media=FSInputFile(f"media_distrib/{obj}"),
-                                                      caption=dat['text'])
-                            else:
-                                media_group.add_photo(type="photo", media=FSInputFile(f"media_distrib/{obj}"))
-                        sck += 1
-                    for member in members:
-                        await bot.send_media_group(member, media=media_group.build())
-                else:
-                    for member in members:
-                        await bot.send_message(member, dat['text'])
-                await message.answer('Рассылка завершена', reply_markup=ReplyKeyboardRemove())
-                await message.answer('Сообщения успешно отправлены', reply_markup=admin_back_markup)
-                await del_media('media_distrib')
-                await state.clear()
-            else:
-                await message.answer(f'Апи перегружен на {members} секунд, попробуйте позже',
-                                     reply_markup=ReplyKeyboardRemove())
-                await message.answer('Вернуться в меню', reply_markup=admin_back_markup)
-                await del_media('media_distrib')
-    except exceptions.TelegramForbiddenError:
-        pass
 
 
 @dp.message(Command(commands=["start"]))
