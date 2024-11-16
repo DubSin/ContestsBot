@@ -86,13 +86,13 @@ order_back_markup = InlineKeyboardMarkup(
     inline_keyboard=[[InlineKeyboardButton(text="Заказать еще", callback_data="order")],
                      [InlineKeyboardButton(text="Вернуться в меню", callback_data="back")]])
 
-prod_dict = {"prod_sneakers": ['Кросовки', 0.5], "prod_winter_shoes": ['Зимняя обувь', 0.5],
-             "prod_pants": ['Штаны', 0.5], "prod_shorts": ['Шорты', 0.5],
-             "prod_shirts": ['Футболки и Рубашки', 0.5], "prod_balls": ['Мячи', 0.5],
-             "prod_decors": ['Украшения', 0.5], "prod_perfumes": ['Парфюмы', 0.5],
-             "prod_sweatshirts": ['Кофты и свитера🩳', 0.5], "prod_jacket": ['Верхняя одежда', 0.5],
-             "prod_underwear": ['Нижнее белье', 0.5], "prod_accessories": ['Аксессуары', 0.5],
-             "prod_small_bag": ['Маленькая сумка', 0.5], "prod_big_bag": ['Большая сумка/Рюкзак', 0.5]}
+prod_dict = {"prod_sneakers": ['Кросовки', 0.6], "prod_winter_shoes": ['Зимняя обувь', 1.1],
+             "prod_pants": ['Штаны', 0.7], "prod_shorts": ['Шорты', 0.35],
+             "prod_shirts": ['Футболки и Рубашки', 0.5], "prod_balls": ['Мячи', 0.6],
+             "prod_decors": ['Украшения', 0.3], "prod_perfumes": ['Парфюмы', 0.3],
+             "prod_sweatshirts": ['Кофты и свитера🩳', 0.7], "prod_jacket": ['Верхняя одежда', 1],
+             "prod_underwear": ['Нижнее белье', 0.2], "prod_accessories": ['Аксессуары', 0.3],
+             "prod_small_bag": ['Маленькая сумка', 0.5], "prod_big_bag": ['Большая сумка/Рюкзак', 0.7]}
 
 
 class ContestState(StatesGroup):
