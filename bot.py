@@ -130,7 +130,7 @@ def is_admin(admin_list, message):
 @dp.message(Command(commands=["admin"]))
 async def start_menu(message: types.Message, bot: Bot):
     admins = await bot.get_chat_administrators(chat_id=keys.HOOPS_ID)
-    if is_admin(admins, message) or message.from_user.id == keys.ADMIN_ID:
+    if is_admin(admins, message) or message.from_user.id == keys.ADMIN_ID or message.from_user.id == keys.ADMIN_ID2:
         await message.answer('Приветствую в панели админа ', reply_markup=admin_markup)
 
 
